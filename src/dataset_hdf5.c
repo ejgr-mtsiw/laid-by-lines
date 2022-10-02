@@ -43,6 +43,35 @@ bool hdf5_file_has_dataset(const char* filename, const char* datasetname)
 	return exists;
 }
 
+oknok_t hdf5_open_dataset(const char* filename, const char* datasetname,
+						  dataset_hdf5_t* dataset)
+{
+	// Open the data file
+	hid_t file_id = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+	if (file_id < 1)
+	{
+		// Error creating file
+		fprintf(stderr, "Error opening file %s\n", filename);
+		return NOK;
+	}
+
+	// Open input dataset
+	hid_t dataset_id = H5Dopen(file_id, datasetname, H5P_DEFAULT);
+	if (dataset_id < 1)
+	{
+		// Error opening dataset
+		fprintf(stderr, "Dataset %s not found!\n", datasetname);
+		H5Fclose(file_id);
+		return NOK;
+	}
+
+	dataset->file_id	= file_id;
+	dataset->dataset_id = dataset_id;
+	hdf5_get_dataset_dimensions(dataset_id, dataset->dimensions);
+
+	return OK;
+}
+
 oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 {
 	uint32_t n_classes = 0;

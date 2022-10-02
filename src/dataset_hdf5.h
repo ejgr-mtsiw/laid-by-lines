@@ -70,6 +70,12 @@ bool hdf5_dataset_exists(const hid_t file_id, const char* dataset);
 bool hdf5_file_has_dataset(const char* filename, const char* datasetname);
 
 /**
+ * Opens the file and dataset indicated
+ */
+oknok_t hdf5_open_dataset(const char* filename, const char* datasetname,
+						  dataset_hdf5_t* dataset);
+
+/**
  * Reads the dataset attributes from the hdf5 file
  */
 oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset);

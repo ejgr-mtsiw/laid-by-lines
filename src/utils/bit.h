@@ -79,10 +79,10 @@ static const word_t AND_MASK_TABLE[64] = { 0x1,
 										   0x8000000000000000 };
 
 /* a=target variable, b=bit number to act upon 0-n */
-#define BIT_SET(a, b)			   ((a) |= ((word_t) 1UL << (b)))
-#define BIT_CLEAR(a, b)			   ((a) &= ~((word_t) 1UL << (b)))
-#define BIT_FLIP(a, b)			   ((a) ^= ((word_t) 1UL << (b)))
-#define BIT_CHECK(a, b)			   (!!((a) & ((word_t) 1UL << (b))))
+#define BIT_SET(a, b)			   ((a) |= ((word_t) 1 << (b)))
+#define BIT_CLEAR(a, b)			   ((a) &= ~((word_t) 1 << (b)))
+#define BIT_FLIP(a, b)			   ((a) ^= ((word_t) 1 << (b)))
+#define BIT_CHECK(a, b)			   (!!((a) & ((word_t) 1 << (b))))
 #define BITMASK_SET(x, mask)	   ((x) |= (mask))
 #define BITMASK_CLEAR(x, mask)	   ((x) &= (~(mask)))
 #define BITMASK_FLIP(x, mask)	   ((x) ^= (mask))
