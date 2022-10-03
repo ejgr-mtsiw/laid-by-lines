@@ -8,13 +8,9 @@
 
 #include "dataset.h"
 #include "dataset_hdf5.h"
-#include "dataset_hdf5_mpi.h"
 #include "disjoint_matrix.h"
-#include "disjoint_matrix_mpi.h"
 #include "jnsq.h"
 #include "set_cover.h"
-#include "set_cover_hdf5_mpi.h"
-#include "types/cover_t.h"
 #include "types/dataset_hdf5_t.h"
 #include "types/dataset_t.h"
 #include "types/dm_t.h"
@@ -30,12 +26,10 @@
 #include "hdf5.h"
 #include "mpi.h"
 
-#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <unistd.h>
 
 /**
  * In this mode we don't write the disjoint matrix (DM).
@@ -521,41 +515,10 @@ int main(int argc, char** argv)
 				attribute_totals[c_attribute] += BIT_CHECK(lxor, bit);
 			}
 		}
-
-		//		 printf("[%d] - Build line ", rank);
-		//
-		//		 TOCK(stdout);
-		//		 TICK;
 	}
-
-	// exit(EXIT_SUCCESS);
-
-	// for (int r = 0; r < size; r++)
-	//{
-	//	if (r == rank)
-	//	{
-	//		printf("totals for rank %d: ", rank);
-	//		for (uint32_t i = 0; i < dataset.n_attributes; i++)
-	//		{
-	//			printf("%d ", attribute_totals[i]);
-	//		}
-	//		printf("\n");
-	//	}
-	//	sleep(1);
-	// }
 
 	MPI_Reduce(attribute_totals, global_attribute_totals, dataset.n_attributes,
 			   MPI_UINT32_T, MPI_SUM, 0, comm);
-
-	//	if (rank == 0)
-	//	{
-	//		printf("GLOBAL totals for rank %d:\n", rank);
-	//		for (uint32_t i = 0; i < MIN(10, dataset.n_attributes); i++)
-	//		{
-	//			printf("%d ", global_attribute_totals[i]);
-	//		}
-	//		printf("\n");
-	//	}
 
 	//*********************************************************/
 	// END BUILD INITIAL TOTALS
@@ -702,34 +665,9 @@ int main(int argc, char** argv)
 			}
 		}
 
-		//	for (int r = 0; r < size; r++)
-		//	{
-		//		if (r == rank)
-		//		{
-		//			printf("totals for rank %d: ", rank);
-		//			for (uint32_t i = 0; i < MIN(10,dataset.n_attributes); i++)
-		//			{
-		//				printf("%d ", attribute_totals[i]);
-		//			}
-		//			printf("\n");
-		//		}
-		//		sleep(1);
-		//	}
-
 mpi_reduce:
 		MPI_Reduce(attribute_totals, attribute_totals_buffer,
 				   dataset.n_attributes, MPI_UINT32_T, MPI_SUM, 0, comm);
-
-		//	if (rank == 0)
-		//	{
-		//		printf("[%d] totals for attribute %ld: \n", rank,
-		// best_attribute); 		for (uint32_t i = 0; i <
-		// MIN(10,dataset.n_attributes); i++)
-		//		{
-		//			printf("%d ", attribute_totals_buffer[i]);
-		//		}
-		//		printf("\n\n");
-		//	}
 
 		//***************************************************************/
 		// END UPDATE ATTRIBUTES TOTALS
@@ -757,14 +695,6 @@ mpi_reduce:
 			{
 				global_attribute_totals[i] -= attribute_totals_buffer[i];
 			}
-
-			//	 printf("[%d] GLOBAL totals: \n", rank);
-			//	  for (uint32_t i = 0; i < MIN(10,dataset.n_attributes); i++)
-			//	{
-			//	  printf("  g: %d, b: %d\n", global_attribute_totals[i],
-			//	  attribute_totals_buffer[i]);
-			//	 }
-			//	 printf("\n");
 		}
 		//***************************************************************/
 		//  END UPDATE GLOBAL TOTALS
@@ -790,9 +720,6 @@ show_solution:
 		printf("}\n");
 	}
 
-	//  wait for everyone
-	MPI_Barrier(comm);
-
 	if (rank == 0)
 	{
 		fprintf(stdout, "All done! ");
@@ -802,6 +729,10 @@ show_solution:
 				(main_tock.tv_nsec - main_tick.tv_nsec) / 1000000000.0
 					+ (main_tock.tv_sec - main_tick.tv_sec));
 	}
+
+	//  wait for everyone
+	MPI_Barrier(comm);
+	MPI_Win_free(&win_shared_dset);
 
 	dataset.data = NULL;
 	dm.steps	 = NULL;
