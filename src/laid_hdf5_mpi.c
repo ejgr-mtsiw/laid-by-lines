@@ -457,6 +457,9 @@ int main(int argc, char** argv)
 	uint32_t n_words_in_column
 		= dm.n_matrix_lines / WORD_BITS + (dm.n_matrix_lines % WORD_BITS != 0);
 
+	word_t* best_column
+				= (word_t*) calloc(n_words_in_column, sizeof(word_t));
+
 	word_t* covered_lines = (word_t*) calloc(n_words_in_column, sizeof(word_t));
 
 	/**
@@ -581,10 +584,6 @@ int main(int argc, char** argv)
 		//***********************************************************/
 		// BUILD BEST COLUMN
 		//***********************************************************/
-
-		word_t* best_column
-			= (word_t*) calloc(n_words_in_column, sizeof(word_t));
-
 		for (uint32_t line = 0; line < dm.s_size; line++)
 		{
 			word_t* la = dataset.data + dm.steps[line].indexA * dataset.n_words
