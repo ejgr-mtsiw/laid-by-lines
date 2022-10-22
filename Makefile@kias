@@ -1,5 +1,5 @@
 CC				:= mpicc
-CPPFLAGS		:= -Wall -Wextra -Werror -pedantic-errors
+CPPFLAGS		:= -Wall -Wextra -Werror -pedantic-errors -std=c99
 LDFLAGS			:= -L/usr/lib -L/usr/local/lib -lm -lhdf5 -lmpi
 BUILD			:= ./bin
 OBJ_DIR			:= $(BUILD)/objects

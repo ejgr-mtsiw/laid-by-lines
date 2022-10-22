@@ -150,10 +150,11 @@ int main(int argc, char** argv)
 	/**
 	 * Timing for the full operation
 	 */
-	struct timespec main_tick, main_tock;
+	time_t main_tick = 0, main_tock = 0;
 	if (rank == 0)
 	{
-		clock_gettime(CLOCK_MONOTONIC_RAW, &main_tick);
+		// Timing for the full operation
+		main_tick = time(0);
 	}
 
 	/**
@@ -457,8 +458,7 @@ int main(int argc, char** argv)
 	uint32_t n_words_in_column
 		= dm.n_matrix_lines / WORD_BITS + (dm.n_matrix_lines % WORD_BITS != 0);
 
-	word_t* best_column
-				= (word_t*) calloc(n_words_in_column, sizeof(word_t));
+	word_t* best_column = (word_t*) calloc(n_words_in_column, sizeof(word_t));
 
 	word_t* covered_lines = (word_t*) calloc(n_words_in_column, sizeof(word_t));
 
@@ -487,6 +487,11 @@ int main(int argc, char** argv)
 	 */
 	word_t* selected_attributes = NULL;
 
+	/**
+	 * Number of uncovered lines. Only root needs this.
+	 */
+	uint32_t n_uncovered_lines = 0;
+
 	if (rank == 0)
 	{
 		global_attribute_totals
@@ -496,6 +501,9 @@ int main(int argc, char** argv)
 			= (uint32_t*) calloc(dataset.n_attributes, sizeof(uint32_t));
 
 		selected_attributes = (word_t*) calloc(dataset.n_words, sizeof(word_t));
+
+		// No line covered so far
+		n_uncovered_lines = dm.n_matrix_lines;
 	}
 
 	//*********************************************************/
@@ -532,12 +540,36 @@ int main(int argc, char** argv)
 		/**
 		 * Get best attribute index
 		 */
-		int64_t best_attribute = 0;
+		int64_t best_attribute = -1;
 
 		if (rank == 0)
 		{
 			best_attribute = get_best_attribute_index(global_attribute_totals,
 													  dataset.n_attributes);
+
+			printf(" - Selected attribute #%ld [%d]", best_attribute,
+				   global_attribute_totals[best_attribute]);
+
+			TOCK(stdout);
+			TICK;
+
+			// Which word has the best attribute
+			uint32_t best_word = best_attribute / WORD_BITS;
+
+			// Which bit?
+			uint32_t best_bit = WORD_BITS - best_attribute % WORD_BITS - 1;
+
+			// Mark best attribute as selected
+			BIT_SET(selected_attributes[best_word], best_bit);
+
+			// Update number of lines remaining
+			n_uncovered_lines -= global_attribute_totals[best_attribute];
+
+			// If we covered all of them, we can leave earlier
+			if (n_uncovered_lines == 0)
+			{
+				best_attribute = -1;
+			}
 		}
 
 		/**
@@ -553,24 +585,6 @@ int main(int argc, char** argv)
 			goto show_solution;
 		}
 
-		// Which word has the best attribute
-		uint32_t best_word = best_attribute / WORD_BITS;
-
-		// Which bit?
-		uint32_t best_bit = WORD_BITS - best_attribute % WORD_BITS - 1;
-
-		if (rank == 0)
-		{
-			printf(" - Selected attribute #%ld [%d]", best_attribute,
-				   attribute_totals[best_attribute]);
-
-			TOCK(stdout);
-			TICK;
-
-			// Mark best attribute as selected
-			BIT_SET(selected_attributes[best_word], best_bit);
-		}
-
 		/**
 		 * We can get some lopsized distribution, and some process might finish
 		 * earlier, but we need to participate in the mpi reduce
@@ -580,6 +594,12 @@ int main(int argc, char** argv)
 			printf("[%d] NOTHING TO DO!\n", rank);
 			goto mpi_reduce;
 		}
+
+		// Which word has the best attribute
+		uint32_t best_word = best_attribute / WORD_BITS;
+
+		// Which bit?
+		uint32_t best_bit = WORD_BITS - best_attribute % WORD_BITS - 1;
 
 		//***********************************************************/
 		// BUILD BEST COLUMN
@@ -723,10 +743,8 @@ show_solution:
 	{
 		fprintf(stdout, "All done! ");
 
-		clock_gettime(CLOCK_MONOTONIC_RAW, &main_tock);
-		fprintf(stdout, "[%0.3fs]\n",
-				(main_tock.tv_nsec - main_tick.tv_nsec) / 1000000000.0
-					+ (main_tock.tv_sec - main_tick.tv_sec));
+		main_tock = time(0);
+		fprintf(stdout, "[%lds]\n", main_tock - main_tick);
 	}
 
 	//  wait for everyone
