@@ -181,6 +181,9 @@ int main(int argc, char** argv)
 	/**
 	 * Open dataset file
 	 */
+	ROOT_SHOWS("Using dataset '%s'\n", args.filename);
+	ROOT_SHOWS("Using %d processes\n\n", size);
+
 	if (node_rank == LOCAL_ROOT_RANK)
 	{
 		if (hdf5_open_dataset(args.filename, args.datasetname, &hdf5_dset)
@@ -219,7 +222,7 @@ int main(int argc, char** argv)
 	 * All table pointers should now point to copy on noderank 0
 	 */
 
-	ROOT_SAYS("- Finished MPI RMA Init ");
+	ROOT_SAYS("Initializing MPI RMA: ");
 	TOCK;
 
 	/**
@@ -229,7 +232,7 @@ int main(int argc, char** argv)
 
 	if (node_rank == LOCAL_ROOT_RANK)
 	{
-		ROOT_SAYS("- Loading dataset data\n");
+		ROOT_SAYS("Reading dataset: ");
 
 		/**
 		 * Load dataset attributes
@@ -237,32 +240,30 @@ int main(int argc, char** argv)
 		hdf5_read_dataset_attributes(hdf5_dset.dataset_id, &dataset);
 
 		/**
-		 * Load dataset attributes
+		 * Load dataset data
 		 */
 		hdf5_read_dataset_data(hdf5_dset.dataset_id, dataset.data);
 
+		TOCK;
 		/**
 		 * Print dataset details
 		 */
-		ROOT_SAYS("Dataset:\n");
-		ROOT_SHOWS(" - classes = %d", dataset.n_classes);
+		ROOT_SHOWS("  Classes = %d", dataset.n_classes);
 		ROOT_SHOWS(" [%d bits]\n", dataset.n_bits_for_class);
-		ROOT_SHOWS(" - attributes = %d \n", dataset.n_attributes);
-		ROOT_SHOWS(" - observations = %d \n", dataset.n_observations);
-		ROOT_SAYS(" - Finished loading dataset data ");
+		ROOT_SHOWS("  Attributes = %d \n", dataset.n_attributes);
+		ROOT_SHOWS("  Observations = %d \n", dataset.n_observations);
 
 		/**
 		 * We no longer need the dataset file
 		 */
 		hdf5_close_dataset(&hdf5_dset);
 
-		TOCK;
 		TICK;
 
 		/**Sort dataset
 		 *
 		 */
-		ROOT_SAYS("- Sorting dataset\n");
+		ROOT_SAYS("Sorting dataset: ");
 
 		/**
 		 * We need to know the number of longs in each line of the dataset
@@ -272,25 +273,24 @@ int main(int argc, char** argv)
 			   dataset.n_words * sizeof(word_t), compare_lines_extra,
 			   &dataset.n_words);
 
-		ROOT_SAYS(" - Sorted dataset");
 		TOCK;
 		TICK;
 
 		/**
 		 * Remove duplicates
 		 */
-		ROOT_SAYS("- Removing duplicates:\n");
+		ROOT_SAYS("Removing duplicates: ");
 
 		unsigned int duplicates = remove_duplicates(&dataset);
 
-		ROOT_SHOWS(" - %d duplicate(s) removed ", duplicates);
 		TOCK;
+		ROOT_SHOWS("  %d duplicate(s) removed\n", duplicates);
 		TICK;
 
 		/**
 		 * Fill class arrays
 		 */
-		fprintf(stdout, "- Checking classes: ");
+		ROOT_SAYS("Checking classes: ");
 
 		if (fill_class_arrays(&dataset) != OK)
 		{
@@ -301,7 +301,7 @@ int main(int argc, char** argv)
 
 		for (unsigned int i = 0; i < dataset.n_classes; i++)
 		{
-			ROOT_SHOWS(" - class %d: ", i);
+			ROOT_SHOWS("  Class %d: ", i);
 			ROOT_SHOWS("%d item(s)\n", dataset.n_observations_per_class[i]);
 		}
 
@@ -310,13 +310,13 @@ int main(int argc, char** argv)
 		/**
 		 * Set JNSQ
 		 */
-		ROOT_SAYS("- Setting up JNSQ attributes:\n");
+		ROOT_SAYS("Setting up JNSQ attributes: ");
 
 		unsigned int max_jnsq = add_jnsqs(&dataset);
 
-		ROOT_SHOWS(" - Max JNSQ: %d", max_jnsq);
-		ROOT_SHOWS(" [%d bits] ", dataset.n_bits_for_jnsqs);
 		TOCK;
+		ROOT_SHOWS("  Max JNSQ: %d", max_jnsq);
+		ROOT_SHOWS(" [%d bits]\n", dataset.n_bits_for_jnsqs);
 	}
 
 	/**
@@ -364,7 +364,7 @@ int main(int argc, char** argv)
 	{
 		TICK;
 
-		ROOT_SAYS("- Generating matrix steps\n");
+		ROOT_SAYS("Generating matrix steps: ");
 
 		uint32_t nc	   = dataset.n_classes;
 		uint32_t no	   = dataset.n_observations;
@@ -397,12 +397,18 @@ int main(int argc, char** argv)
 		dataset.n_observations_per_class = NULL;
 		dataset.observations_per_class	 = NULL;
 
-		ROOT_SHOWS(" - Finished generating %d matrix steps ",
-				   dm.n_matrix_lines);
 		TOCK;
+
+		ROOT_SHOWS("  %d matrix steps generated\n", dm.n_matrix_lines);
+
+		double matrix_size
+			= ((double) dm.n_matrix_lines
+			   * (dataset.n_attributes + dataset.n_bits_for_jnsqs))
+			/ (1024 * 1024 * 8);
+		ROOT_SHOWS("  Estimated disjoint matrix size: %3.2fMB\n", matrix_size);
 	}
 
-	ROOT_SAYS("- Broadcasting attributes\n");
+	TICK ROOT_SAYS("Broadcasting attributes: ");
 
 	uint64_t toshare[4];
 	if (node_rank == LOCAL_ROOT_RANK)
@@ -442,8 +448,7 @@ int main(int argc, char** argv)
 			steps=NULL;
 		}
 	*/
-	ROOT_SAYS(" - Finished broadcasting attributes\n");
-	TICK;
+	TOCK;
 
 	//	for (int r = 0; r < size; r++)
 	//	{
@@ -491,9 +496,8 @@ int main(int argc, char** argv)
 	 *  - goto loop
 	 */
 
+	ROOT_SAYS("Applying set covering algorithm:\n");
 	TICK;
-
-	ROOT_SAYS("- Applying set covering algorithm\n");
 
 	// The covered lines and covered attributes are bit arrays
 	uint32_t n_words_in_column
@@ -593,8 +597,9 @@ int main(int argc, char** argv)
 			best_attribute = get_best_attribute_index(global_attribute_totals,
 													  dataset.n_attributes);
 
-			printf(" - Selected attribute #%ld [%d]", best_attribute,
-				   global_attribute_totals[best_attribute]);
+			ROOT_SHOWS("  Selected attribute #%ld, ", best_attribute);
+			ROOT_SHOWS("covers %d lines ",
+					   global_attribute_totals[best_attribute]);
 
 			TOCK;
 			TICK;
