@@ -215,8 +215,8 @@ int main(int argc, char** argv)
 	{
 		MPI_Aint win_size;
 		int win_disp;
-		MPI_Win_shared_query(win_shared_dset, 0, &win_size, &win_disp,
-							 &dataset.data);
+		MPI_Win_shared_query(win_shared_dset, LOCAL_ROOT_RANK, &win_size,
+							 &win_disp, &dataset.data);
 	}
 	/**
 	 * All table pointers should now point to copy on noderank 0
@@ -348,7 +348,8 @@ int main(int argc, char** argv)
 	{
 		MPI_Aint win_size;
 		int win_disp;
-		MPI_Win_shared_query(win_shared_steps, 0, &win_size, &win_disp, &steps);
+		MPI_Win_shared_query(win_shared_steps, LOCAL_ROOT_RANK, &win_size,
+							 &win_disp, &steps);
 	}
 	/**
 	 * All table pointers should now point to copy on noderank 0
@@ -416,11 +417,11 @@ int main(int argc, char** argv)
 		toshare[2] = dataset.n_words;
 		toshare[3] = dm.n_matrix_lines;
 
-		MPI_Bcast(&toshare, 4, MPI_UINT64_T, 0, node_comm);
+		MPI_Bcast(&toshare, 4, MPI_UINT64_T, LOCAL_ROOT_RANK, node_comm);
 	}
 	else
 	{
-		MPI_Bcast(&toshare, 4, MPI_UINT64_T, 0, node_comm);
+		MPI_Bcast(&toshare, 4, MPI_UINT64_T, LOCAL_ROOT_RANK, node_comm);
 
 		dataset.n_attributes   = toshare[0];
 		dataset.n_observations = toshare[1];
@@ -435,19 +436,10 @@ int main(int argc, char** argv)
 	dm.s_size	= BLOCK_SIZE(rank, size, dm.n_matrix_lines);
 
 	/**
-	 * Make a copy of the steps
+	 * Each step has the info needed to generate a line of the
+	 * disjoint matrix, the steps for this process start here
 	 */
-	//dm.steps = (steps_t*) malloc(dm.s_size * sizeof(steps_t));
-	//memcpy(dm.steps, steps + dm.s_offset, dm.s_size * sizeof(steps_t));
-
-	dm.steps=steps+dm.s_offset;
-
-	/**
-	 * We no longer need the original steps
-	 */
-	//MPI_Barrier(node_comm);
-	//MPI_Win_free(&win_shared_steps);
-	//dm.steps=NULL;
+	dm.steps = steps + dm.s_offset;
 
 	TOCK;
 
@@ -579,7 +571,7 @@ int main(int argc, char** argv)
 	}
 
 	MPI_Reduce(attribute_totals, global_attribute_totals, dataset.n_attributes,
-			   MPI_UINT32_T, MPI_SUM, 0, comm);
+			   MPI_UINT32_T, MPI_SUM, ROOT_RANK, comm);
 
 	//*********************************************************/
 	// END BUILD INITIAL TOTALS
@@ -833,11 +825,19 @@ show_solution:
 
 	//  wait for everyone
 	MPI_Barrier(comm);
-	MPI_Win_free(&win_shared_dset);
 
 	/**
 	 * Free memory
 	 */
+
+	// Free shared steps
+	MPI_Win_free(&win_shared_steps);
+	dataset.data = NULL;
+
+	// Free shared dataset
+	MPI_Win_free(&win_shared_dset);
+	dm.steps = NULL;
+
 	free(best_column);
 	best_column = NULL;
 
