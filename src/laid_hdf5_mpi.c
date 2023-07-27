@@ -171,8 +171,6 @@ int main(int argc, char** argv)
 		main_tick = time(0);
 	}
 
-	TICK;
-
 	/**
 	 * Only rank 0 on a node actually reads the dataset and allocates memory
 	 */
@@ -183,6 +181,8 @@ int main(int argc, char** argv)
 	 */
 	ROOT_SHOWS("Using dataset '%s'\n", args.filename);
 	ROOT_SHOWS("Using %d processes\n\n", size);
+	ROOT_SAYS("Initializing MPI RMA: ");
+	TICK;
 
 	if (node_rank == LOCAL_ROOT_RANK)
 	{
@@ -221,18 +221,15 @@ int main(int argc, char** argv)
 	/**
 	 * All table pointers should now point to copy on noderank 0
 	 */
-
-	ROOT_SAYS("Initializing MPI RMA: ");
 	TOCK;
 
 	/**
 	 * Setup dataset
 	 */
-	TICK;
-
 	if (node_rank == LOCAL_ROOT_RANK)
 	{
 		ROOT_SAYS("Reading dataset: ");
+		TICK;
 
 		/**
 		 * Load dataset attributes
@@ -258,12 +255,11 @@ int main(int argc, char** argv)
 		 */
 		hdf5_close_dataset(&hdf5_dset);
 
-		TICK;
-
 		/**Sort dataset
 		 *
 		 */
 		ROOT_SAYS("Sorting dataset: ");
+		TICK;
 
 		/**
 		 * We need to know the number of longs in each line of the dataset
@@ -274,23 +270,23 @@ int main(int argc, char** argv)
 			   &dataset.n_words);
 
 		TOCK;
-		TICK;
 
 		/**
 		 * Remove duplicates
 		 */
 		ROOT_SAYS("Removing duplicates: ");
+		TICK;
 
 		unsigned int duplicates = remove_duplicates(&dataset);
 
 		TOCK;
 		ROOT_SHOWS("  %d duplicate(s) removed\n", duplicates);
-		TICK;
 
 		/**
 		 * Fill class arrays
 		 */
 		ROOT_SAYS("Checking classes: ");
+		TICK;
 
 		if (fill_class_arrays(&dataset) != OK)
 		{
@@ -305,12 +301,11 @@ int main(int argc, char** argv)
 			ROOT_SHOWS("%d item(s)\n", dataset.n_observations_per_class[i]);
 		}
 
-		TICK;
-
 		/**
 		 * Set JNSQ
 		 */
 		ROOT_SAYS("Setting up JNSQ attributes: ");
+		TICK;
 
 		unsigned int max_jnsq = add_jnsqs(&dataset);
 
@@ -326,7 +321,7 @@ int main(int argc, char** argv)
 	// MPI_Barrier(node_comm);
 
 	dm.n_matrix_lines = 0;
-	if (node_rank == 0)
+	if (node_rank == LOCAL_ROOT_RANK)
 	{
 		dm.n_matrix_lines = get_dm_n_lines(&dataset);
 	}
@@ -342,8 +337,10 @@ int main(int argc, char** argv)
 	 */
 	steps_t* steps = NULL;
 
-	// Set dataset data pointer
-	if (node_rank == 0)
+	/**
+	 * Set dataset data pointer
+	 */
+	if (node_rank == LOCAL_ROOT_RANK)
 	{
 		steps = localsteps;
 	}
@@ -362,16 +359,17 @@ int main(int argc, char** argv)
 	 */
 	if (node_rank == LOCAL_ROOT_RANK)
 	{
-		TICK;
-
 		ROOT_SAYS("Generating matrix steps: ");
+		TICK;
 
 		uint32_t nc	   = dataset.n_classes;
 		uint32_t no	   = dataset.n_observations;
 		uint32_t* opc  = dataset.observations_per_class;
 		uint32_t* nopc = dataset.n_observations_per_class;
 
-		// DO IT
+		/**
+		 * DO IT
+		 */
 		uint32_t cs = 0;
 
 		for (uint32_t ca = 0; ca < nc - 1; ca++)
@@ -398,7 +396,6 @@ int main(int argc, char** argv)
 		dataset.observations_per_class	 = NULL;
 
 		TOCK;
-
 		ROOT_SHOWS("  %d matrix steps generated\n", dm.n_matrix_lines);
 
 		double matrix_size
@@ -408,7 +405,8 @@ int main(int argc, char** argv)
 		ROOT_SHOWS("  Estimated disjoint matrix size: %3.2fMB\n", matrix_size);
 	}
 
-	TICK ROOT_SAYS("Broadcasting attributes: ");
+	ROOT_SAYS("Distributing steps: ");
+	TICK;
 
 	uint64_t toshare[4];
 	if (node_rank == LOCAL_ROOT_RANK)
@@ -430,24 +428,27 @@ int main(int argc, char** argv)
 		dm.n_matrix_lines	   = toshare[3];
 	}
 
-	// dm.steps	= steps;
+	/**
+	 * Steps distribution per processor
+	 */
 	dm.s_offset = BLOCK_LOW(rank, size, dm.n_matrix_lines);
 	dm.s_size	= BLOCK_SIZE(rank, size, dm.n_matrix_lines);
 
-	// Make a copy of the steps
-	dm.steps = (steps_t*) malloc(dm.s_size * sizeof(steps_t));
-	memcpy(dm.steps, steps + dm.s_offset, dm.s_size * sizeof(steps_t));
+	/**
+	 * Make a copy of the steps
+	 */
+	//dm.steps = (steps_t*) malloc(dm.s_size * sizeof(steps_t));
+	//memcpy(dm.steps, steps + dm.s_offset, dm.s_size * sizeof(steps_t));
 
-	// We no longer need the original steps
-	MPI_Barrier(node_comm);
-	MPI_Win_free(&win_shared_steps);
+	dm.steps=steps+dm.s_offset;
 
-	//! Look at this
-	/*	if (rank==ROOT_RANK){
-			free(steps);
-			steps=NULL;
-		}
-	*/
+	/**
+	 * We no longer need the original steps
+	 */
+	//MPI_Barrier(node_comm);
+	//MPI_Win_free(&win_shared_steps);
+	//dm.steps=NULL;
+
 	TOCK;
 
 	//	for (int r = 0; r < size; r++)
@@ -508,8 +509,8 @@ int main(int argc, char** argv)
 	word_t* covered_lines = (word_t*) calloc(n_words_in_column, sizeof(word_t));
 
 	/**
-	 * The number of attributes is rounded so we can check all bits during
-	 * the attribute totals calculation
+	 * The number of attributes is rounded so we can check all bits of the
+	 * words during the attribute totals calculation
 	 */
 	uint32_t* attribute_totals = (uint32_t*) calloc(
 		roundUp(dataset.n_attributes, WORD_BITS), sizeof(uint32_t));
@@ -559,7 +560,6 @@ int main(int argc, char** argv)
 	//*********************************************************/
 	// BUILD INITIAL TOTALS
 	//*********************************************************/
-	// TICK;
 	for (uint32_t line = 0; line < dm.s_size; line++)
 	{
 		word_t* la = dataset.data + dm.steps[line].indexA * dataset.n_words;
@@ -592,7 +592,7 @@ int main(int argc, char** argv)
 		 */
 		int64_t best_attribute = -1;
 
-		if (rank == 0)
+		if (rank == ROOT_RANK)
 		{
 			best_attribute = get_best_attribute_index(global_attribute_totals,
 													  dataset.n_attributes);
@@ -600,7 +600,6 @@ int main(int argc, char** argv)
 			ROOT_SHOWS("  Selected attribute #%ld, ", best_attribute);
 			ROOT_SHOWS("covers %d lines ",
 					   global_attribute_totals[best_attribute]);
-
 			TOCK;
 			TICK;
 
@@ -819,6 +818,8 @@ show_solution:
 		}
 		fprintf(stdout, "}\n");
 		fprintf(stdout, "All done! ");
+		main_tock = time(0);
+		fprintf(stdout, "[%lds]\n", main_tock - main_tick);
 
 		free(global_attribute_totals);
 		global_attribute_totals = NULL;
@@ -854,12 +855,6 @@ show_solution:
 
 	/* shut down MPI */
 	MPI_Finalize();
-
-	if (rank == ROOT_RANK)
-	{
-		main_tock = time(0);
-		fprintf(stdout, "[%lds]\n", main_tock - main_tick);
-	}
 
 	return EXIT_SUCCESS;
 }

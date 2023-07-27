@@ -1,10 +1,12 @@
 #!/bin/bash
 
-#SBATCH --job-name=compile@short
+#SBATCH --job-name="P3-compile@short"
+
 ##SBATCH --time=0:1:0
+
+#SBATCH --ntasks=1
 ##SBATCH --nodes=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --ntasks=1
 
 # Be sure to request the correct partition to avoid the job to be held in the queue, furthermore
 #	on CIRRUS-B (Minho)  choose for example HPC_4_Days
