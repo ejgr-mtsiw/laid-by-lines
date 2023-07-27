@@ -878,11 +878,13 @@ show_solution:
 
 	// Free shared steps
 	MPI_Win_free(&win_shared_steps);
-	dataset.data = NULL;
+	dm.steps = NULL;
+	free_dm(&dm);
 
 	// Free shared dataset
 	MPI_Win_free(&win_shared_dset);
-	dm.steps = NULL;
+	dataset.data = NULL;
+	free_dataset(&dataset);
 
 	free(best_column);
 	best_column = NULL;
@@ -892,12 +894,6 @@ show_solution:
 
 	free(attribute_totals);
 	attribute_totals = NULL;
-
-	dataset.data = NULL;
-	dm.steps	 = NULL;
-
-	free_dataset(&dataset);
-	free_dm(&dm);
 
 	/* shut down MPI */
 	MPI_Finalize();
