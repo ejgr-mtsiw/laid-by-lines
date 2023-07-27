@@ -492,6 +492,16 @@ int main(int argc, char** argv)
 	ROOT_SAYS("Applying set covering algorithm:\n");
 	TICK;
 
+	/**
+	 * Number of words with WORD_BITS attributes
+	 */
+	uint32_t n_full_words = dataset.n_words - 1;
+
+	/**
+	 * Last bit to process in the last word
+	 */
+	uint8_t n_last_word = WORD_BITS - (dataset.n_attributes % WORD_BITS);
+
 	// The covered lines and covered attributes are bit arrays
 	uint32_t n_words_in_column
 		= dm.n_matrix_lines / WORD_BITS + (dm.n_matrix_lines % WORD_BITS != 0);
@@ -501,11 +511,10 @@ int main(int argc, char** argv)
 	word_t* covered_lines = (word_t*) calloc(n_words_in_column, sizeof(word_t));
 
 	/**
-	 * The number of attributes is rounded so we can check all bits of the
-	 * words during the attribute totals calculation
+	 * The local attribute totals
 	 */
-	uint32_t* attribute_totals = (uint32_t*) calloc(
-		roundUp(dataset.n_attributes, WORD_BITS), sizeof(uint32_t));
+	uint32_t* attribute_totals
+		= (uint32_t*) calloc(dataset.n_attributes, sizeof(uint32_t));
 
 	/**
 	 * Global totals. Only root needs these
@@ -552,21 +561,40 @@ int main(int argc, char** argv)
 	//*********************************************************/
 	// BUILD INITIAL TOTALS
 	//*********************************************************/
-	for (uint32_t line = 0; line < dm.s_size; line++)
+	for (uint32_t step = 0; step < dm.s_size; step++)
 	{
-		word_t* la = dataset.data + dm.steps[line].indexA * dataset.n_words;
-		word_t* lb = dataset.data + dm.steps[line].indexB * dataset.n_words;
 
+		word_t* la = dataset.data + dm.steps[step].indexA * dataset.n_words;
+		word_t* lb = dataset.data + dm.steps[step].indexB * dataset.n_words;
+
+		/**
+		 * Current attribute
+		 */
 		uint32_t c_attribute = 0;
 
-		for (uint32_t w = 0; w < dataset.n_words; w++)
+		/**
+		 * Current word
+		 */
+		uint32_t c_word = 0;
+
+		// Process full words
+		for (c_word = 0; c_word < n_full_words; c_word++)
 		{
-			word_t lxor = la[w] ^ lb[w];
+			word_t lxor = la[c_word] ^ lb[c_word];
 
 			for (int8_t bit = WORD_BITS - 1; bit >= 0; bit--, c_attribute++)
 			{
 				attribute_totals[c_attribute] += BIT_CHECK(lxor, bit);
 			}
+		}
+
+		// Process last word
+		word_t lxor = la[c_word] ^ lb[c_word];
+
+		for (int8_t bit = WORD_BITS - 1; bit >= n_last_word;
+			 bit--, c_attribute++)
+		{
+			attribute_totals[c_attribute] += BIT_CHECK(lxor, bit);
 		}
 	}
 
@@ -696,8 +724,7 @@ int main(int argc, char** argv)
 		/**
 		 * Reset attributes totals
 		 */
-		memset(attribute_totals, 0,
-			   roundUp(dataset.n_attributes, WORD_BITS) * sizeof(uint32_t));
+		memset(attribute_totals, 0, dataset.n_attributes * sizeof(uint32_t));
 
 		/**
 		 * Get the totals for the uncovered lines covered by the best attribute.
@@ -740,19 +767,38 @@ int main(int argc, char** argv)
 			 * This line was uncovered, but is covered now
 			 * Calculate attributes totals
 			 */
+
 			word_t* la = dataset.data + dm.steps[line].indexA * dataset.n_words;
 			word_t* lb = dataset.data + dm.steps[line].indexB * dataset.n_words;
 
+			/**
+			 * Current attribute
+			 */
 			uint32_t c_attribute = 0;
 
-			for (uint32_t w = 0; w < dataset.n_words; w++)
+			/**
+			 * Current word
+			 */
+			uint32_t c_word = 0;
+
+			// Process full words
+			for (c_word = 0; c_word < n_full_words; c_word++)
 			{
-				word_t lxor = la[w] ^ lb[w];
+				word_t lxor = la[c_word] ^ lb[c_word];
 
 				for (int8_t bit = WORD_BITS - 1; bit >= 0; bit--, c_attribute++)
 				{
 					attribute_totals[c_attribute] += BIT_CHECK(lxor, bit);
 				}
+			}
+
+			// Process last word
+			word_t lxor = la[c_word] ^ lb[c_word];
+
+			for (int8_t bit = WORD_BITS - 1; bit >= n_last_word;
+				 bit--, c_attribute++)
+			{
+				attribute_totals[c_attribute] += BIT_CHECK(lxor, bit);
 			}
 		}
 
