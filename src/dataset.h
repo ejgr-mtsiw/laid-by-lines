@@ -23,10 +23,6 @@
 #define DATASET_NOT_ENOUGH_OBSERVATIONS 8
 #define DATASET_ERROR_ALLOCATING_DATA	16
 
-/**
- *
- */
-
 #define NEXT_LINE(line, n_words) ((line) += (n_words))
 
 #define GET_NEXT_LINE(line, n_words) ((line) + (n_words))
@@ -71,11 +67,6 @@ uint32_t remove_duplicates(dataset_t* dataset);
  * calculation of the disjoint matrix
  */
 oknok_t fill_class_arrays(dataset_t* dataset);
-
-/**
- * Prints some attributes of the dataset to stream
- */
-void print_dataset_details(FILE* stream, const dataset_t* dataset);
 
 /**
  * Frees dataset memory

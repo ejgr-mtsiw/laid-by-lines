@@ -19,7 +19,7 @@ INPUT_DATASET_FILE="$DATASET_DIR/$DATASET_FILE"
 
 ## MAYBE CHANGE THIS!
 
-EXE="./bin/laid-hdf5-mpi-lines"
+EXE="./bin/laid-by-lines"
 
 # Disable warning for mismatched library versions
 # Cirrus.8 has different hdf5 versions on short and hpc partitions

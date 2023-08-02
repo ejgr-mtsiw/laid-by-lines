@@ -24,7 +24,7 @@ int read_args(int argc, char** argv, clargs_t* args)
 	 * Init/Reset initial values
 	 */
 	args->datasetname = NULL;
-	args->filename = NULL;
+	args->filename	  = NULL;
 
 	/**
 	 * This is the main configuration of all options available.
