@@ -16,6 +16,7 @@
 #include "types/dataset_hdf5_t.h"
 #include "types/dataset_t.h"
 #include "types/dm_t.h"
+#include "types/steps_t.h"
 #include "types/word_t.h"
 #include "utils/bit.h"
 #include "utils/block.h"
@@ -355,6 +356,21 @@ int main(int argc, char** argv)
 	dm.s_offset = BLOCK_LOW(rank, size, dm.n_matrix_lines);
 	dm.s_size	= BLOCK_SIZE(rank, size, dm.n_matrix_lines);
 
+	/**
+	 * The steps to build the lines of the disjoint matrix of this process
+	 */
+	steps_t* steps = (steps_t*) malloc(dm.s_size * sizeof(steps_t));
+
+	// generate steps
+	generate_steps(&dataset, &dm, steps);
+
+	// We no longer need these
+	free(dataset.n_observations_per_class);
+	dataset.n_observations_per_class = NULL;
+
+	free(dataset.observations_per_class);
+	dataset.observations_per_class = NULL;
+
 	TOCK;
 
 	if (rank == ROOT_RANK)
@@ -429,9 +445,11 @@ int main(int argc, char** argv)
 
 	/**
 	 * The local attribute totals
+	 * Use n_words instead of n_attributes to avoid extra
+	 * verifications on last word
 	 */
 	uint32_t* attribute_totals
-		= (uint32_t*) malloc(dataset.n_attributes* sizeof(uint32_t));
+		= (uint32_t*) malloc(dataset.n_words * WORD_BITS * sizeof(uint32_t));
 
 	/**
 	 * Global totals. Only root needs these
@@ -439,8 +457,8 @@ int main(int argc, char** argv)
 
 	/**
 	 * Full total for each attribute.
-	 * It's filled at the start using the sum of all the totals for each
-	 * process.
+	 * Use n_words instead of n_attributes on allocation to avoid
+	 * extra verifications on last word
 	 */
 	uint32_t* global_attribute_totals = NULL;
 
@@ -457,7 +475,7 @@ int main(int argc, char** argv)
 	if (rank == ROOT_RANK)
 	{
 		global_attribute_totals
-			= (uint32_t*) calloc(dataset.n_attributes, sizeof(uint32_t));
+			= (uint32_t*) calloc(dataset.n_words * WORD_BITS, sizeof(uint32_t));
 
 		selected_attributes = (word_t*) calloc(dataset.n_words, sizeof(word_t));
 
@@ -465,18 +483,14 @@ int main(int argc, char** argv)
 		n_uncovered_lines = dm.n_matrix_lines;
 	}
 
-	// Get class offsets for first step of the computation
-	class_offsets_t class_offsets;
-	calculate_class_offsets(&dataset, dm.s_offset, &class_offsets);
-
 	while (true)
 	{
 		// Reset attributes totals
 		memset(attribute_totals, 0, dataset.n_attributes * sizeof(uint32_t));
 
 		// Calculate partial totals
-		calculate_attribute_totals(&dataset, &class_offsets, covered_lines,
-								   dm.s_size, attribute_totals);
+		calculate_attribute_totals(steps, covered_lines, dm.s_size,
+								   dataset.n_words, attribute_totals);
 
 		// Calculate global totals
 		MPI_Reduce(attribute_totals, global_attribute_totals,
@@ -520,8 +534,7 @@ int main(int argc, char** argv)
 		}
 
 		// Update covered lines
-		update_covered_lines(&dataset, &class_offsets, covered_lines, dm.s_size,
-							 best_attribute);
+		update_covered_lines(steps, covered_lines, dm.s_size, best_attribute);
 	}
 
 show_solution:
@@ -566,16 +579,19 @@ show_solution:
 		selected_attributes = NULL;
 	}
 
-	// Free shared dataset
-	MPI_Win_free(&win_shared_dset);
-	dataset.data = NULL;
-	free_dataset(&dataset);
+	free(steps);
+	steps = NULL;
 
 	free(covered_lines);
 	covered_lines = NULL;
 
 	free(attribute_totals);
 	attribute_totals = NULL;
+
+	// Free shared dataset
+	MPI_Win_free(&win_shared_dset);
+	dataset.data = NULL;
+	free_dataset(&dataset);
 
 	/* shut down MPI */
 	MPI_Finalize();

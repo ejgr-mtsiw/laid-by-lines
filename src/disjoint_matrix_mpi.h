@@ -20,6 +20,6 @@
  * line of the disjoint matrix
  */
 oknok_t calculate_class_offsets(const dataset_t* dataset, const uint32_t line,
-								  class_offsets_t* class_offsets);
+								class_offsets_t* class_offsets);
 
 #endif // MPI_DISJOINT_MATRIX_H
