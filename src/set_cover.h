@@ -18,6 +18,11 @@
 #include <stdint.h>
 
 /**
+ * Number of words to process per disjoint matrix cycle
+ */
+#define N_WORDS_PER_CYCLE 8
+
+/**
  * Searches the attribute totals array for the highest score and returns the
  * correspondent attribute index.
  * Returns -1 if there are no more attributes available.

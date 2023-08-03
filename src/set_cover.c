@@ -55,6 +55,9 @@ oknok_t generate_steps(dataset_t* dataset, dm_t* dm, steps_t* steps)
 
 	uint32_t cl = 0;
 
+	// TODO: I think we can optimize the order of the lines
+	// to get faster results when calculating the attributes totals
+
 	while (ca < nc - 1)
 	{
 		word_t** bla = opc + ca * nobs;
@@ -98,38 +101,47 @@ oknok_t calculate_attribute_totals(steps_t* steps, word_t* covered_lines,
 								   uint32_t n_matrix_lines, uint32_t n_words,
 								   uint32_t* attribute_totals)
 {
-
-	for (uint32_t cl = 0; cl < n_matrix_lines; cl++)
+	for (uint32_t c_word = 0; c_word < n_words; c_word += N_WORDS_PER_CYCLE)
 	{
-		/**
-		 * Is this line covered?
-		 * Yes: skip
-		 * No: add
-		 */
-		uint32_t cl_word = cl / WORD_BITS;
-		uint8_t cl_bit	 = WORD_BITS - cl % WORD_BITS - 1;
-
-		// Is this line not covered?
-		if (!BIT_CHECK(covered_lines[cl_word], cl_bit))
+		// We may not have N_WORDS_PER_CYCLE words to process
+		uint32_t end_word = c_word + N_WORDS_PER_CYCLE;
+		if (end_word > n_words)
 		{
+			end_word = n_words;
+		}
 
-			// This line is uncovered: calculate attributes totals
-
-			word_t* la = steps[cl].lineA;
-			word_t* lb = steps[cl].lineB;
-
+		for (uint32_t cl = 0; cl < n_matrix_lines; cl++)
+		{
 			/**
-			 * Current attribute
+			 * Is this line covered?
+			 * Yes: skip
+			 * No: add
 			 */
-			uint32_t c_attribute = 0;
+			uint32_t cl_word = cl / WORD_BITS;
+			uint8_t cl_bit	 = WORD_BITS - cl % WORD_BITS - 1;
 
-			for (uint32_t c_word = 0; c_word < n_words; c_word++)
+			// Is this line not covered?
+			if (!BIT_CHECK(covered_lines[cl_word], cl_bit))
 			{
-				word_t lxor = la[c_word] ^ lb[c_word];
+				// This line is uncovered: calculate attributes totals
 
-				for (int8_t bit = WORD_BITS - 1; bit >= 0; bit--, c_attribute++)
+				word_t* la = steps[cl].lineA;
+				word_t* lb = steps[cl].lineB;
+
+				/**
+				 * Current attribute
+				 */
+				uint32_t c_attribute = c_word * WORD_BITS;
+
+				for (uint32_t n_word = c_word; n_word < end_word; n_word++)
 				{
-					attribute_totals[c_attribute] += BIT_CHECK(lxor, bit);
+					word_t lxor = la[n_word] ^ lb[n_word];
+
+					for (int8_t bit = WORD_BITS - 1; bit >= 0;
+						 bit--, c_attribute++)
+					{
+						attribute_totals[c_attribute] += BIT_CHECK(lxor, bit);
+					}
 				}
 			}
 		}
