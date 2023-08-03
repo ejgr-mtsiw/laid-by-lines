@@ -9,7 +9,6 @@
 #include "dataset.h"
 #include "dataset_hdf5.h"
 #include "disjoint_matrix.h"
-#include "disjoint_matrix_mpi.h"
 #include "jnsq.h"
 #include "set_cover.h"
 #include "types/class_offsets_t.h"

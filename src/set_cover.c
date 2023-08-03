@@ -8,7 +8,6 @@
 
 #include "set_cover.h"
 
-#include "disjoint_matrix_mpi.h"
 #include "types/class_offsets_t.h"
 #include "types/dataset_t.h"
 #include "types/dm_t.h"
@@ -45,53 +44,51 @@ oknok_t generate_steps(dataset_t* dataset, dm_t* dm, steps_t* steps)
 	word_t** opc   = dataset->observations_per_class;
 	uint32_t* nopc = dataset->n_observations_per_class;
 
-	class_offsets_t class_offsets;
-	calculate_class_offsets(dataset, dm->s_offset, &class_offsets);
-
-	uint32_t ca = class_offsets.classA;
-	uint32_t ia = class_offsets.indexA;
-	uint32_t cb = class_offsets.classB;
-	uint32_t ib = class_offsets.indexB;
-
-	uint32_t cl = 0;
-
 	// TODO: I think we can optimize the order of the lines
-	// to get faster results when calculating the attributes totals
+	// to optimize cache usage and get faster results
+	// when calculating the attributes totals
 
-	while (ca < nc - 1)
+	uint32_t cl		  = 0;
+	uint32_t cl_start = dm->s_offset;
+	uint32_t cl_end	  = dm->s_offset + dm->s_size;
+	uint32_t cs		  = 0;
+	uint32_t ca		  = 0;
+	uint32_t ia		  = 0;
+	uint32_t cb		  = 0;
+	uint32_t ib		  = 0;
+
+	// TODO: is there a better way?
+
+	for (ca = 0; ca < nc - 1; ca++)
 	{
-		word_t** bla = opc + ca * nobs;
-
-		while (ia < nopc[ca])
+		for (cb = ca + 1; cb < nc; cb++)
 		{
-			while (cb < nc)
+			for (ia = 0; ia < nopc[ca]; ia++)
 			{
-				word_t** blb = opc + cb * nobs;
-
-				while (ib < nopc[cb])
+				for (ib = 0; ib < nopc[cb]; ib++, cl++)
 				{
-					if (cl == dm->s_size)
+					if (cl < cl_start)
 					{
+						// Skip to s_offset
+						continue;
+					}
+
+					if (cl == cl_end)
+					{
+						// We have all the steps we need
 						return OK;
 					}
 
-					steps[cl].lineA = *(bla + ia);
-					steps[cl].lineB = *(blb + ib);
+					// Generate next step
+					word_t** bla = opc + ca * nobs;
+					word_t** blb = opc + cb * nobs;
 
-					ib++;
-					cl++;
+					steps[cs].lineA = *(bla + ia);
+					steps[cs].lineB = *(blb + ib);
+					cs++;
 				}
-				cb++;
-				ib = 0;
 			}
-			ia++;
-			cb = ca + 1;
-			ib = 0;
 		}
-		ca++;
-		ia = 0;
-		cb = ca + 1;
-		ib = 0;
 	}
 
 	return OK;
