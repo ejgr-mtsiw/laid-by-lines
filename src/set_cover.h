@@ -9,11 +9,11 @@
 #ifndef SET_COVER_H
 #define SET_COVER_H
 
-#include "types/class_offsets_t.h"
 #include "types/dataset_t.h"
 #include "types/dm_t.h"
 #include "types/oknok_t.h"
 #include "types/steps_t.h"
+#include "types/word_t.h"
 
 #include <stdint.h>
 
@@ -38,10 +38,19 @@ oknok_t generate_steps(dataset_t* dataset, dm_t* dm, steps_t* steps);
 /**
  * Calculates the current attributes totals
  */
-oknok_t calculate_attribute_totals(steps_t* steps, word_t* covered_lines,
+/*oknok_t calculate_attribute_totals(steps_t* steps, word_t* covered_lines,
 								   uint32_t n_matrix_lines, uint32_t n_words,
 								   uint32_t* attribute_totals);
+*/
 
+oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
+									   const steps_t* steps,
+									   const word_t* covered_lines,
+									   uint32_t* attribute_totals);
+oknok_t calculate_attribute_totals_sub(const dataset_t* dataset, const dm_t* dm,
+									   const steps_t* steps,
+									   const word_t* covered_lines,
+									   uint32_t* attribute_totals);
 /**
  * Sets this attribute as selected
  */
@@ -52,7 +61,8 @@ oknok_t mark_attribute_as_selected(word_t* selected_attributes,
  * Updates the list of covered lines, adding the lines covered by the best
  * attribute
  */
-oknok_t update_covered_lines(steps_t* steps, word_t* covered_lines,
-							 uint32_t n_lines_matrix, int64_t best_attribute);
 
+oknok_t update_covered_lines(const word_t* best_column,
+							 const uint32_t n_words_in_a_column,
+							 word_t* covered_lines);
 #endif

@@ -20,6 +20,11 @@ typedef struct dm_t
 	uint32_t n_matrix_lines;
 
 	/**
+	 * Number of words needed to store a column
+	 */
+	uint32_t n_words_in_a_column;
+
+	/**
 	 * The offset in the full matrix
 	 */
 	uint32_t s_offset;

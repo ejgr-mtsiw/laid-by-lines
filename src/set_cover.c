@@ -17,6 +17,7 @@
 #include "utils/bit.h"
 
 #include <stdint.h>
+#include <string.h>
 
 int64_t get_best_attribute_index(const uint32_t* totals,
 								 const uint32_t n_attributes)
@@ -94,20 +95,25 @@ oknok_t generate_steps(dataset_t* dataset, dm_t* dm, steps_t* steps)
 	return OK;
 }
 
-oknok_t calculate_attribute_totals(steps_t* steps, word_t* covered_lines,
-								   uint32_t n_matrix_lines, uint32_t n_words,
-								   uint32_t* attribute_totals)
+oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
+									   const steps_t* steps,
+									   const word_t* covered_lines,
+									   uint32_t* attribute_totals)
 {
-	for (uint32_t c_word = 0; c_word < n_words; c_word += N_WORDS_PER_CYCLE)
+	// Reset attributes totals
+	memset(attribute_totals, 0, dataset->n_attributes * sizeof(uint32_t));
+
+	for (uint32_t c_word = 0; c_word < dataset->n_words;
+		 c_word += N_WORDS_PER_CYCLE)
 	{
 		// We may not have N_WORDS_PER_CYCLE words to process
 		uint32_t end_word = c_word + N_WORDS_PER_CYCLE;
-		if (end_word > n_words)
+		if (end_word > dataset->n_words)
 		{
-			end_word = n_words;
+			end_word = dataset->n_words;
 		}
 
-		for (uint32_t cl = 0; cl < n_matrix_lines; cl++)
+		for (uint32_t cl = 0; cl < dm->s_size; cl++)
 		{
 			/**
 			 * Is this line covered?
@@ -115,7 +121,7 @@ oknok_t calculate_attribute_totals(steps_t* steps, word_t* covered_lines,
 			 * No: add
 			 */
 			uint32_t cl_word = cl / WORD_BITS;
-			uint8_t cl_bit	 = WORD_BITS - cl % WORD_BITS - 1;
+			uint8_t cl_bit	 = WORD_BITS - (cl % WORD_BITS) - 1;
 
 			// Is this line not covered?
 			if (!BIT_CHECK(covered_lines[cl_word], cl_bit))
@@ -125,9 +131,7 @@ oknok_t calculate_attribute_totals(steps_t* steps, word_t* covered_lines,
 				word_t* la = steps[cl].lineA;
 				word_t* lb = steps[cl].lineB;
 
-				/**
-				 * Current attribute
-				 */
+				// Current attribute
 				uint32_t c_attribute = c_word * WORD_BITS;
 
 				for (uint32_t n_word = c_word; n_word < end_word; n_word++)
@@ -147,33 +151,67 @@ oknok_t calculate_attribute_totals(steps_t* steps, word_t* covered_lines,
 	return OK;
 }
 
-oknok_t update_covered_lines(steps_t* steps, word_t* covered_lines,
-							 uint32_t n_lines_matrix, int64_t best_attribute)
+oknok_t calculate_attribute_totals_sub(const dataset_t* dataset, const dm_t* dm,
+									   const steps_t* steps,
+									   const word_t* covered_lines,
+									   uint32_t* attribute_totals)
 {
-	/**
-	 * Which word has the best attribute
-	 */
-	uint32_t best_word = best_attribute / WORD_BITS;
 
-	/**
-	 * In which bit?
-	 */
-	uint32_t best_bit = WORD_BITS - best_attribute % WORD_BITS - 1;
-
-	for (uint32_t cl = 0; cl < n_lines_matrix; cl++)
+	for (uint32_t c_word = 0; c_word < dataset->n_words;
+		 c_word += N_WORDS_PER_CYCLE)
 	{
-		uint32_t cl_word = cl / WORD_BITS;
-		uint8_t cl_bit	 = WORD_BITS - cl % WORD_BITS - 1;
-
-		word_t* la = steps[cl].lineA;
-		word_t* lb = steps[cl].lineB;
-
-		word_t lxor = la[best_word] ^ lb[best_word];
-
-		if (BIT_CHECK(lxor, best_bit))
+		// We may not have N_WORDS_PER_CYCLE words to process
+		uint32_t end_word = c_word + N_WORDS_PER_CYCLE;
+		if (end_word > dataset->n_words)
 		{
-			BIT_SET(covered_lines[cl_word], cl_bit);
+			end_word = dataset->n_words;
 		}
+
+		for (uint32_t cl = 0; cl < dm->s_size; cl++)
+		{
+			/**
+			 * Is this line covered?
+			 * Yes: skip
+			 * No: add
+			 */
+			uint32_t cl_word = cl / WORD_BITS;
+			uint8_t cl_bit	 = WORD_BITS - (cl % WORD_BITS) - 1;
+
+			// Is this line covered?
+			if (BIT_CHECK(covered_lines[cl_word], cl_bit))
+			{
+				// This line is now covered: calculate attributes totals
+
+				word_t* la = steps[cl].lineA;
+				word_t* lb = steps[cl].lineB;
+
+				// Current attribute
+				uint32_t c_attribute = c_word * WORD_BITS;
+
+				for (uint32_t n_word = c_word; n_word < end_word; n_word++)
+				{
+					word_t lxor = la[n_word] ^ lb[n_word];
+
+					for (int8_t bit = WORD_BITS - 1; bit >= 0;
+						 bit--, c_attribute++)
+					{
+						attribute_totals[c_attribute] -= BIT_CHECK(lxor, bit);
+					}
+				}
+			}
+		}
+	}
+
+	return OK;
+}
+
+oknok_t update_covered_lines(const word_t* best_column,
+							 const uint32_t n_words_in_a_column,
+							 word_t* covered_lines)
+{
+	for (uint32_t w = 0; w < n_words_in_a_column; w++)
+	{
+		covered_lines[w] |= best_column[w];
 	}
 
 	return OK;
