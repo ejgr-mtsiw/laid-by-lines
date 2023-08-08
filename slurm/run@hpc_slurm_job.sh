@@ -2,7 +2,7 @@
 
 ##CHANGE THIS!
 
-#SBATCH --job-name="P3-1x1-bench_dataset@hpc"
+#SBATCH --job-name="P4-1x1-bench_dataset@hpc"
 
 ##SBATCH --time=0:1:0
 
@@ -52,9 +52,9 @@ if [ -f "$INPUT_DATASET_FILE" ]; then
 	if [ -f "$EXE" ]; then
 		chmod u+x $EXE
 
-		echo "mpiexec -np $SLURM_NTASKS $EXE -d $DATASET_NAME -f $INPUT_DATASET_FILE"
+		echo "time mpiexec -np $SLURM_NTASKS $EXE -d $DATASET_NAME -f $INPUT_DATASET_FILE"
 		echo
-		mpiexec -np $SLURM_NTASKS $EXE -d $DATASET_NAME -f $INPUT_DATASET_FILE
+		time mpiexec -np $SLURM_NTASKS $EXE -d $DATASET_NAME -f $INPUT_DATASET_FILE
 	else
 		echo "$EXE not found!"
 	fi

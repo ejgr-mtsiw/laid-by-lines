@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="P3-compile@short"
+#SBATCH --job-name="P4-compile@short"
 
 ##SBATCH --time=0:1:0
 
