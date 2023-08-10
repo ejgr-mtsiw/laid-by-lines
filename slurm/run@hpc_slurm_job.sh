@@ -40,6 +40,9 @@ module load gcc11/libs/hdf5/1.14.0
 #	on CIRRUS-A (Lisbon) choose for example hpc
 #SBATCH --partition=hpc
 
+#SBATCH --output=out.%x.%j
+#SBATCH --error=err.%x.%j
+
 ## DON'T CHANGE THIS!
 
 # Run
