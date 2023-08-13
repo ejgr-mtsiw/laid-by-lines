@@ -9,10 +9,10 @@
 #ifndef SET_COVER_H
 #define SET_COVER_H
 
+#include "types/class_offsets_t.h"
 #include "types/dataset_t.h"
 #include "types/dm_t.h"
 #include "types/oknok_t.h"
-#include "types/steps_t.h"
 #include "types/word_t.h"
 
 #include <stdint.h>
@@ -31,37 +31,29 @@ int64_t get_best_attribute_index(const uint64_t* totals,
 								 const uint64_t n_attributes);
 
 /**
- * Generates the steps for the partial disjoint matrix dm
- */
-oknok_t generate_steps(dataset_t* dataset, dm_t* dm, steps_t* steps);
-
-/**
  * Calculates the current attributes totals
  */
 oknok_t calculate_initial_attribute_totals(const dataset_t* dataset,
-										   const dm_t* dm, const steps_t* steps,
-										   uint64_t* attribute_totals);
+										   const dm_t* dm, uint64_t* totals);
 
 oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
-									   const steps_t* steps,
 									   const word_t* covered_lines,
-									   uint64_t* attribute_totals);
+									   uint64_t* totals);
 oknok_t calculate_attribute_totals_sub(const dataset_t* dataset, const dm_t* dm,
-									   const steps_t* steps,
 									   const word_t* covered_lines,
-									   uint64_t* attribute_totals);
+									   uint64_t* totals);
+
 /**
  * Sets this attribute as selected
  */
-oknok_t mark_attribute_as_selected(word_t* selected_attributes,
-								   int64_t attribute);
+oknok_t mark_attribute_as_selected(word_t* attributes, int64_t attribute);
 
 /**
  * Updates the list of covered lines, adding the lines covered by the best
  * attribute
  */
-
 oknok_t update_covered_lines(const word_t* best_column,
 							 const uint64_t n_words_in_a_column,
 							 word_t* covered_lines);
+
 #endif

@@ -15,7 +15,6 @@
 #include "types/dataset_hdf5_t.h"
 #include "types/dataset_t.h"
 #include "types/dm_t.h"
-#include "types/steps_t.h"
 #include "types/word_t.h"
 #include "utils/bit.h"
 #include "utils/block.h"
@@ -366,20 +365,8 @@ int main(int argc, char** argv)
 	dm.s_offset = BLOCK_LOW(rank, size, dm.n_matrix_lines);
 	dm.s_size	= BLOCK_SIZE(rank, size, dm.n_matrix_lines);
 
-	/**
-	 * The steps to build the lines of the disjoint matrix of this process
-	 */
-	steps_t* steps = (steps_t*) malloc(dm.s_size * sizeof(steps_t));
-
-	// generate steps
-	generate_steps(&dataset, &dm, steps);
-
-	// We no longer need these
-	free(dataset.n_observations_per_class);
-	dataset.n_observations_per_class = NULL;
-
-	free(dataset.observations_per_class);
-	dataset.observations_per_class = NULL;
+	// Calculate initial offsets for each process
+	calculate_class_offsets(&dataset, dm.s_offset, &dm.initial_class_offsets);
 
 	TOCK;
 
@@ -471,7 +458,7 @@ int main(int argc, char** argv)
 	 * verifications on last word
 	 */
 	uint64_t* attribute_totals
-		= (uint64_t*) malloc(dataset.n_words * WORD_BITS * sizeof(uint64_t));
+		= (uint64_t*) calloc(dataset.n_words * WORD_BITS, sizeof(uint64_t));
 
 	/**
 	 * Global totals. Only root needs these
@@ -500,17 +487,13 @@ int main(int argc, char** argv)
 			= (uint64_t*) calloc(dataset.n_words * WORD_BITS, sizeof(uint64_t));
 
 		selected_attributes = (word_t*) calloc(dataset.n_words, sizeof(word_t));
-
-		// No line covered so far
-		// n_uncovered_lines = dm.n_matrix_lines;
 	}
 
-	calculate_attribute_totals_add(&dataset, &dm, steps, covered_lines,
-								   attribute_totals);
+	// Calculate the totals for all attributes
+	calculate_initial_attribute_totals(&dataset, &dm, attribute_totals);
 
 	while (true)
 	{
-
 		// Calculate global totals
 		MPI_Reduce(attribute_totals, global_attribute_totals,
 				   dataset.n_attributes, MPI_UINT64_T, MPI_SUM, ROOT_RANK,
@@ -566,29 +549,27 @@ int main(int argc, char** argv)
 			continue;
 		}
 
-		get_column(&dm, steps, best_attribute, best_column);
+		get_column(&dataset, &dm, best_attribute, best_column);
 
 		if (n_uncovered_lines < attribute_totals[best_attribute])
 		{
 			// Add
-
 			// Update covered lines
 			update_covered_lines(best_column, dm.n_words_in_a_column,
 								 covered_lines);
 
-			calculate_attribute_totals_add(&dataset, &dm, steps, covered_lines,
+			calculate_attribute_totals_add(&dataset, &dm, covered_lines,
 										   attribute_totals);
 		}
 		else
 		{
 			// Sub
-
 			for (uint64_t w = 0; w < dm.n_words_in_a_column; w++)
 			{
 				best_column[w] &= ~covered_lines[w];
 			}
 
-			calculate_attribute_totals_sub(&dataset, &dm, steps, best_column,
+			calculate_attribute_totals_sub(&dataset, &dm, best_column,
 										   attribute_totals);
 
 			// Update covered lines
@@ -635,9 +616,6 @@ show_solution:
 		free(selected_attributes);
 		selected_attributes = NULL;
 	}
-
-	free(steps);
-	steps = NULL;
 
 	free(covered_lines);
 	covered_lines = NULL;

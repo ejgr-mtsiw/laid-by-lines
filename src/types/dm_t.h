@@ -10,6 +10,8 @@
 #ifndef DM_T_H
 #define DM_T_H
 
+#include "class_offsets_t.h"
+
 #include <stdint.h>
 
 typedef struct dm_t
@@ -23,6 +25,11 @@ typedef struct dm_t
 	 * Number of words needed to store a column
 	 */
 	uint64_t n_words_in_a_column;
+
+	/**
+	 * Initial offsets for matrix generation
+	 */
+	class_offsets_t initial_class_offsets;
 
 	/**
 	 * The offset in the full matrix

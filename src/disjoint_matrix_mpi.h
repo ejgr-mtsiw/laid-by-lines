@@ -9,14 +9,21 @@
 #ifndef MPI_DISJOINT_MATRIX_H
 #define MPI_DISJOINT_MATRIX_H
 
+#include "types/dataset_t.h"
 #include "types/dm_t.h"
 #include "types/oknok_t.h"
-#include "types/steps_t.h"
 #include "types/word_t.h"
 
 #include <stdint.h>
 
-oknok_t get_column(const dm_t* dm, const steps_t* steps, const int64_t index,
-				   word_t* column);
+oknok_t get_column(const dataset_t* dataset, const dm_t* dm,
+				   const int64_t attribute, word_t* column);
+
+/**
+ * Calculates the class offsets that correspond to the requested
+ * line of the disjoint matrix
+ */
+oknok_t calculate_class_offsets(const dataset_t* dataset, const uint64_t line,
+								class_offsets_t* class_offsets);
 
 #endif // MPI_DISJOINT_MATRIX_H
