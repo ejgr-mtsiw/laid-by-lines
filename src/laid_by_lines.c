@@ -224,10 +224,10 @@ int main(int argc, char** argv)
 		TOCK;
 
 		// Print dataset details
-		ROOT_SHOWS("  Classes = %d", dataset.n_classes);
+		ROOT_SHOWS("  Classes = %lu", dataset.n_classes);
 		ROOT_SHOWS(" [%d bits]\n", dataset.n_bits_for_class);
-		ROOT_SHOWS("  Attributes = %d \n", dataset.n_attributes);
-		ROOT_SHOWS("  Observations = %d \n", dataset.n_observations);
+		ROOT_SHOWS("  Attributes = %lu \n", dataset.n_attributes);
+		ROOT_SHOWS("  Observations = %lu \n", dataset.n_observations);
 
 		// We no longer need the dataset file
 		hdf5_close_dataset(&hdf5_dset);
@@ -250,22 +250,22 @@ int main(int argc, char** argv)
 		ROOT_SAYS("Removing duplicates: ");
 		TICK;
 
-		unsigned int duplicates = remove_duplicates(&dataset);
+		uint64_t duplicates = remove_duplicates(&dataset);
 
 		TOCK;
-		ROOT_SHOWS("  %d duplicate(s) removed\n", duplicates);
+		ROOT_SHOWS("  %lu duplicate(s) removed\n", duplicates);
 	}
 
 	// Share current dataset attributes
-	MPI_Bcast(&(dataset.n_attributes), 1, MPI_UINT32_T, LOCAL_ROOT_RANK,
+	MPI_Bcast(&(dataset.n_attributes), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
 			  node_comm);
-	MPI_Bcast(&(dataset.n_observations), 1, MPI_UINT32_T, LOCAL_ROOT_RANK,
+	MPI_Bcast(&(dataset.n_observations), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
 			  node_comm);
-	MPI_Bcast(&(dataset.n_classes), 1, MPI_UINT32_T, LOCAL_ROOT_RANK,
+	MPI_Bcast(&(dataset.n_classes), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
 			  node_comm);
 	MPI_Bcast(&(dataset.n_bits_for_class), 1, MPI_UINT8_T, LOCAL_ROOT_RANK,
 			  node_comm);
-	MPI_Bcast(&(dataset.n_words), 1, MPI_UINT32_T, LOCAL_ROOT_RANK, node_comm);
+	MPI_Bcast(&(dataset.n_words), 1, MPI_UINT64_T, LOCAL_ROOT_RANK, node_comm);
 
 	// Fill class arrays
 	ROOT_SAYS("Checking classes: ");
@@ -275,7 +275,7 @@ int main(int argc, char** argv)
 	 * Array that stores the number of observations for each class
 	 */
 	dataset.n_observations_per_class
-		= (uint32_t*) calloc(dataset.n_classes, sizeof(uint32_t));
+		= (uint64_t*) calloc(dataset.n_classes, sizeof(uint64_t));
 	assert(dataset.n_observations_per_class != NULL);
 
 	/**
@@ -297,10 +297,10 @@ int main(int argc, char** argv)
 
 	if (rank == ROOT_RANK)
 	{
-		for (unsigned int i = 0; i < dataset.n_classes; i++)
+		for (uint64_t i = 0; i < dataset.n_classes; i++)
 		{
-			ROOT_SHOWS("  Class %d: ", i);
-			ROOT_SHOWS("%d item(s)\n", dataset.n_observations_per_class[i]);
+			ROOT_SHOWS("  Class %lu: ", i);
+			ROOT_SHOWS("%lu item(s)\n", dataset.n_observations_per_class[i]);
 		}
 	}
 
@@ -313,7 +313,7 @@ int main(int argc, char** argv)
 		ROOT_SAYS("Setting up JNSQ attributes: ");
 		TICK;
 
-		uint32_t max_inconsistency = add_jnsqs(&dataset);
+		uint64_t max_inconsistency = add_jnsqs(&dataset);
 
 		// Update number of bits needed for jnsqs
 		if (max_inconsistency > 0)
@@ -325,7 +325,7 @@ int main(int argc, char** argv)
 		}
 
 		TOCK;
-		ROOT_SHOWS("  Max JNSQ: %d", max_inconsistency);
+		ROOT_SHOWS("  Max JNSQ: %lu", max_inconsistency);
 		ROOT_SHOWS(" [%d bits]\n", dataset.n_bits_for_jnsqs);
 	}
 
@@ -389,18 +389,18 @@ int main(int argc, char** argv)
 			/ (1024.0 * 1024 * 1024 * 8);
 		ROOT_SHOWS("  Estimated disjoint matrix size: %3.2fGB\n", matrix_size);
 
-		fprintf(stdout, "  Number of lines in the disjoint matrix: %u\n",
+		fprintf(stdout, "  Number of lines in the disjoint matrix: %lu\n",
 				dm.n_matrix_lines);
 
 		for (int r = 0; r < size; r++)
 		{
-			uint32_t s_offset = BLOCK_LOW(r, size, dm.n_matrix_lines);
-			uint32_t s_size	  = BLOCK_SIZE(r, size, dm.n_matrix_lines);
+			uint64_t s_offset = BLOCK_LOW(r, size, dm.n_matrix_lines);
+			uint64_t s_size	  = BLOCK_SIZE(r, size, dm.n_matrix_lines);
 			if (s_size > 0)
 			{
 				fprintf(stdout,
-						"    Process %d will generate %u lines [%u -> %u]\n", r,
-						s_size, s_offset, s_offset + s_size - 1);
+						"    Process %d will generate %lu lines [%lu -> %lu]\n",
+						r, s_size, s_offset, s_offset + s_size - 1);
 			}
 			else
 			{
@@ -463,15 +463,15 @@ int main(int argc, char** argv)
 	/**
 	 * Number of uncovered lines.
 	 */
-	uint32_t n_uncovered_lines = dm.s_size;
+	uint64_t n_uncovered_lines = dm.s_size;
 
 	/**
 	 * The local attribute totals
 	 * Use n_words instead of n_attributes to avoid extra
 	 * verifications on last word
 	 */
-	uint32_t* attribute_totals
-		= (uint32_t*) malloc(dataset.n_words * WORD_BITS * sizeof(uint32_t));
+	uint64_t* attribute_totals
+		= (uint64_t*) malloc(dataset.n_words * WORD_BITS * sizeof(uint64_t));
 
 	/**
 	 * Global totals. Only root needs these
@@ -482,7 +482,7 @@ int main(int argc, char** argv)
 	 * Use n_words instead of n_attributes on allocation to avoid
 	 * extra verifications on last word
 	 */
-	uint32_t* global_attribute_totals = NULL;
+	uint64_t* global_attribute_totals = NULL;
 
 	/**
 	 * Selected attributes bit array aka the solution
@@ -492,12 +492,12 @@ int main(int argc, char** argv)
 	/**
 	 * Number of uncovered lines in the full matrix. Only root needs this.
 	 */
-	uint32_t global_n_uncovered_lines = dm.n_matrix_lines;
+	uint64_t global_n_uncovered_lines = dm.n_matrix_lines;
 
 	if (rank == ROOT_RANK)
 	{
 		global_attribute_totals
-			= (uint32_t*) calloc(dataset.n_words * WORD_BITS, sizeof(uint32_t));
+			= (uint64_t*) calloc(dataset.n_words * WORD_BITS, sizeof(uint64_t));
 
 		selected_attributes = (word_t*) calloc(dataset.n_words, sizeof(word_t));
 
@@ -513,7 +513,7 @@ int main(int argc, char** argv)
 
 		// Calculate global totals
 		MPI_Reduce(attribute_totals, global_attribute_totals,
-				   dataset.n_attributes, MPI_UINT32_T, MPI_SUM, ROOT_RANK,
+				   dataset.n_attributes, MPI_UINT64_T, MPI_SUM, ROOT_RANK,
 				   comm);
 
 		// Get best attribute index
@@ -525,7 +525,7 @@ int main(int argc, char** argv)
 													  dataset.n_attributes);
 
 			ROOT_SHOWS("  Selected attribute #%ld, ", best_attribute);
-			ROOT_SHOWS("covers %u lines ",
+			ROOT_SHOWS("covers %lu lines ",
 					   global_attribute_totals[best_attribute]);
 			TOCK;
 			TICK;
@@ -562,7 +562,7 @@ int main(int argc, char** argv)
 			// Reset attributes totals because we can have some remaining values
 			// from previous run
 			memset(attribute_totals, 0,
-				   dataset.n_attributes * sizeof(uint32_t));
+				   dataset.n_attributes * sizeof(uint64_t));
 			continue;
 		}
 
@@ -583,7 +583,7 @@ int main(int argc, char** argv)
 		{
 			// Sub
 
-			for (uint32_t w = 0; w < dm.n_words_in_a_column; w++)
+			for (uint64_t w = 0; w < dm.n_words_in_a_column; w++)
 			{
 				best_column[w] &= ~covered_lines[w];
 			}
@@ -605,10 +605,10 @@ show_solution:
 	{
 		fprintf(stdout, "Solution: { ");
 
-		uint32_t current_attribute = 0;
-		uint32_t solution_size	   = 0;
+		uint64_t current_attribute = 0;
+		uint64_t solution_size	   = 0;
 
-		for (uint32_t w = 0; w < dataset.n_words; w++)
+		for (uint64_t w = 0; w < dataset.n_words; w++)
 		{
 			for (int8_t bit = WORD_BITS - 1;
 				 bit >= 0 && current_attribute < dataset.n_attributes;
@@ -617,13 +617,13 @@ show_solution:
 				if (selected_attributes[w] & AND_MASK_TABLE[bit])
 				{
 					// This attribute is set so it's part of the solution
-					fprintf(stdout, "%d ", current_attribute);
+					fprintf(stdout, "%lu ", current_attribute);
 					solution_size++;
 				}
 			}
 		}
 
-		fprintf(stdout, "}\nSolution has %d attributes: %d / %d = %3.4f%%\n",
+		fprintf(stdout, "}\nSolution has %lu attributes: %lu / %lu = %3.4f%%\n",
 				solution_size, solution_size, dataset.n_attributes,
 				((float) solution_size / (float) dataset.n_attributes) * 100);
 

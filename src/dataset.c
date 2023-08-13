@@ -31,8 +31,8 @@ void init_dataset(dataset_t* dataset)
 	dataset->n_words				  = 0;
 }
 
-uint32_t get_class(const word_t* line, const uint32_t n_attributes,
-				   const uint32_t n_words, const uint8_t n_bits_for_class)
+uint64_t get_class(const word_t* line, const uint64_t n_attributes,
+				   const uint64_t n_words, const uint8_t n_bits_for_class)
 {
 	// How many attributes remain on last word with attributes
 	uint8_t remaining = n_attributes % WORD_BITS;
@@ -44,7 +44,7 @@ uint32_t get_class(const word_t* line, const uint32_t n_attributes,
 		// Class starts here
 		uint8_t at = (uint8_t) (WORD_BITS - remaining - n_bits_for_class);
 
-		return (uint32_t) get_bits(line[n_words - 1], at, n_bits_for_class);
+		return (uint64_t) get_bits(line[n_words - 1], at, n_bits_for_class);
 	}
 
 	// Class bits are split between 2 words
@@ -56,10 +56,10 @@ uint32_t get_class(const word_t* line, const uint32_t n_attributes,
 	uint8_t n_bits_l = n_bits_for_class - n_bits_p;
 
 	// Class bits from penultimate word
-	uint32_t high_b = (uint32_t) get_bits(line[n_words - 2], 0, n_bits_p);
+	uint64_t high_b = (uint64_t) get_bits(line[n_words - 2], 0, n_bits_p);
 
 	// Class bits from last word
-	uint32_t low_b = (uint32_t) get_bits(line[n_words - 1],
+	uint64_t low_b = (uint64_t) get_bits(line[n_words - 1],
 										 WORD_BITS - n_bits_l, n_bits_l);
 
 	// Merge bits
@@ -77,9 +77,9 @@ int compare_lines_extra(const void* a, const void* b, void* n_words)
 	word_t va		  = 0;
 	word_t vb		  = 0;
 
-	uint32_t n_l = *(uint32_t*) n_words;
+	uint64_t n_l = *(uint64_t*) n_words;
 
-	for (uint32_t i = 0; i < n_l; i++)
+	for (uint64_t i = 0; i < n_l; i++)
 	{
 		va = ula[i];
 		vb = ulb[i];
@@ -99,16 +99,16 @@ int compare_lines_extra(const void* a, const void* b, void* n_words)
 }
 
 bool has_same_attributes(const word_t* line_a, const word_t* line_b,
-						 const uint32_t n_attributes)
+						 const uint64_t n_attributes)
 {
 	// How many full words are used for attributes?
-	uint32_t n_words = (uint32_t) (n_attributes / WORD_BITS);
+	uint64_t n_words = (uint64_t) (n_attributes / WORD_BITS);
 
 	// How many attributes remain on last word
 	uint8_t remaining = n_attributes % WORD_BITS;
 
 	// Current word
-	uint32_t c_word = 0;
+	uint64_t c_word = 0;
 
 	// Check full words
 	for (c_word = 0; c_word < n_words; c_word++)
@@ -132,16 +132,16 @@ bool has_same_attributes(const word_t* line_a, const word_t* line_b,
 	return (last_word == 0);
 }
 
-uint32_t remove_duplicates(dataset_t* dataset)
+uint64_t remove_duplicates(dataset_t* dataset)
 {
 	word_t* line = dataset->data;
 	word_t* last = line;
 
-	uint32_t n_words   = dataset->n_words;
-	uint32_t n_obs	   = dataset->n_observations;
-	uint32_t n_uniques = 1;
+	uint64_t n_words   = dataset->n_words;
+	uint64_t n_obs	   = dataset->n_observations;
+	uint64_t n_uniques = 1;
 
-	for (uint32_t i = 0; i < n_obs - 1; i++)
+	for (uint64_t i = 0; i < n_obs - 1; i++)
 	{
 		NEXT_LINE(line, n_words);
 		if (compare_lines_extra(line, last, &n_words) != 0)
@@ -163,19 +163,19 @@ uint32_t remove_duplicates(dataset_t* dataset)
 oknok_t fill_class_arrays(dataset_t* dataset)
 {
 	// Number of longs in a line
-	uint32_t n_words = dataset->n_words;
+	uint64_t n_words = dataset->n_words;
 
 	// Number of attributes
-	uint32_t n_attributes = dataset->n_attributes;
+	uint64_t n_attributes = dataset->n_attributes;
 
 	// Number of observations
-	uint32_t n_obs = dataset->n_observations;
+	uint64_t n_obs = dataset->n_observations;
 
 	// Number of bits needed to store class
 	uint8_t n_bits_for_class = dataset->n_bits_for_class;
 
 	// Array that stores the number of observations for each class
-	uint32_t* n_class_obs = dataset->n_observations_per_class;
+	uint64_t* n_class_obs = dataset->n_observations_per_class;
 
 	// Matrix that stores the list of observations per class
 	word_t** class_obs = dataset->observations_per_class;
@@ -184,9 +184,9 @@ oknok_t fill_class_arrays(dataset_t* dataset)
 	word_t* line = dataset->data;
 
 	// This is the current index
-	for (uint32_t i = 0; i < n_obs; i++)
+	for (uint64_t i = 0; i < n_obs; i++)
 	{
-		uint32_t lc = get_class(line, n_attributes, n_words, n_bits_for_class);
+		uint64_t lc = get_class(line, n_attributes, n_words, n_bits_for_class);
 
 		class_obs[lc * n_obs + n_class_obs[lc]] = line;
 

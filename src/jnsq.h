@@ -27,8 +27,8 @@
  * Inconsistentes em ambiente HDF5+ Python na cloud INCD. Revista de
  * Ciências da Computação, 85-112.
  */
-void set_jnsq_bits(word_t* line, uint32_t inconsistency,
-				   const uint32_t n_attributes, const uint32_t n_words,
+void set_jnsq_bits(word_t* line, uint64_t inconsistency,
+				   const uint64_t n_attributes, const uint64_t n_words,
 				   const uint8_t n_bits_for_class);
 
 /**
@@ -37,6 +37,6 @@ void set_jnsq_bits(word_t* line, uint32_t inconsistency,
  *
  * Returns max inconsistency found
  */
-uint32_t add_jnsqs(dataset_t* dataset);
+uint64_t add_jnsqs(dataset_t* dataset);
 
 #endif

@@ -15,8 +15,8 @@
 
 #include <stdint.h>
 
-void set_jnsq_bits(word_t* line, uint32_t inconsistency,
-				   const uint32_t n_attributes, const uint32_t n_words,
+void set_jnsq_bits(word_t* line, uint64_t inconsistency,
+				   const uint64_t n_attributes, const uint64_t n_words,
 				   const uint8_t n_bits_for_class)
 {
 	// How many attributes remain on last word with attributes
@@ -64,7 +64,7 @@ void set_jnsq_bits(word_t* line, uint32_t inconsistency,
 		= set_bits(line[n_words - 1], inconsistency, jnsq_start, n_bits);
 }
 
-uint32_t add_jnsqs(dataset_t* dataset)
+uint64_t add_jnsqs(dataset_t* dataset)
 {
 	// Current line
 	word_t* current = dataset->data;
@@ -73,13 +73,13 @@ uint32_t add_jnsqs(dataset_t* dataset)
 	word_t* prev = current;
 
 	// Number of attributes
-	uint32_t n_attributes = dataset->n_attributes;
+	uint64_t n_attributes = dataset->n_attributes;
 
 	// Number of longs in a line
-	uint32_t n_words = dataset->n_words;
+	uint64_t n_words = dataset->n_words;
 
 	// Number of observations in the dataset
-	uint32_t n_observations = dataset->n_observations;
+	uint64_t n_observations = dataset->n_observations;
 
 	// Number of bits needed to store class
 	uint8_t n_bits_for_class = dataset->n_bits_for_class;
@@ -88,10 +88,10 @@ uint32_t add_jnsqs(dataset_t* dataset)
 	word_t* last = GET_LAST_LINE(dataset->data, n_observations, n_words);
 
 	// Inconsistency
-	uint32_t inconsistency = 0;
+	uint64_t inconsistency = 0;
 
 	// Max inconsistency found
-	uint32_t max_inconsistency = 0;
+	uint64_t max_inconsistency = 0;
 
 	// First line has jnsq=0
 	set_jnsq_bits(current, 0, n_attributes, n_words, n_bits_for_class);

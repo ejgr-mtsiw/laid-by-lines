@@ -21,7 +21,8 @@
 #define DATASET_NOT_ENOUGH_CLASSES		2
 #define DATASET_NOT_ENOUGH_ATTRIBUTES	4
 #define DATASET_NOT_ENOUGH_OBSERVATIONS 8
-#define DATASET_ERROR_ALLOCATING_DATA	16
+
+#define DATASET_ERROR_ALLOCATING_DATA 16
 
 #define NEXT_LINE(line, n_words) ((line) += (n_words))
 
@@ -38,8 +39,8 @@ void init_dataset(dataset_t* dataset);
 /**
  * Returns the class of this data line
  */
-uint32_t get_class(const word_t* line, const uint32_t n_attributes,
-				   const uint32_t n_words, const uint8_t n_bits_for_class);
+uint64_t get_class(const word_t* line, const uint64_t n_attributes,
+				   const uint64_t n_words, const uint8_t n_bits_for_class);
 
 /**
  * Compares two lines of the dataset
@@ -52,14 +53,14 @@ int compare_lines_extra(const void* a, const void* b, void* n_words);
  * Checks if the lines have the same attributes
  */
 bool has_same_attributes(const word_t* a, const word_t* b,
-						 const uint32_t n_attributes);
+						 const uint64_t n_attributes);
 
 /**
  * Removes duplicated lines from the dataset.
  * Assumes the dataset is ordered
  * Returns number of removed observations
  */
-uint32_t remove_duplicates(dataset_t* dataset);
+uint64_t remove_duplicates(dataset_t* dataset);
 
 /**
  * Fill the arrays with the number of items per class and also a matrix with

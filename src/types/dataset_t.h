@@ -18,12 +18,12 @@ typedef struct dataset_t
 	/**
 	 * Number of attributes
 	 */
-	uint32_t n_attributes;
+	uint64_t n_attributes;
 
 	/**
 	 * Number of words needed to store a line
 	 */
-	uint32_t n_words;
+	uint64_t n_words;
 
 	/**
 	 * Number of bits needed to store jnsqs (max 32)
@@ -33,12 +33,12 @@ typedef struct dataset_t
 	/**
 	 * Number of observations
 	 */
-	uint32_t n_observations;
+	uint64_t n_observations;
 
 	/**
 	 * Number of classes
 	 */
-	uint32_t n_classes;
+	uint64_t n_classes;
 
 	/**
 	 * Number of bits used to store the class (max 32)
@@ -53,7 +53,7 @@ typedef struct dataset_t
 	/**
 	 * Array with number of observations per class
 	 */
-	uint32_t* n_observations_per_class;
+	uint64_t* n_observations_per_class;
 
 	/**
 	 * Array with pointers for each observation per class.

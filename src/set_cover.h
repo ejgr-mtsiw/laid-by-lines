@@ -27,8 +27,8 @@
  * correspondent attribute index.
  * Returns -1 if there are no more attributes available.
  */
-int64_t get_best_attribute_index(const uint32_t* totals,
-								 const uint32_t n_attributes);
+int64_t get_best_attribute_index(const uint64_t* totals,
+								 const uint64_t n_attributes);
 
 /**
  * Generates the steps for the partial disjoint matrix dm
@@ -38,19 +38,18 @@ oknok_t generate_steps(dataset_t* dataset, dm_t* dm, steps_t* steps);
 /**
  * Calculates the current attributes totals
  */
-/*oknok_t calculate_attribute_totals(steps_t* steps, word_t* covered_lines,
-								   uint32_t n_matrix_lines, uint32_t n_words,
-								   uint32_t* attribute_totals);
-*/
+oknok_t calculate_initial_attribute_totals(const dataset_t* dataset,
+										   const dm_t* dm, const steps_t* steps,
+										   uint64_t* attribute_totals);
 
 oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
 									   const steps_t* steps,
 									   const word_t* covered_lines,
-									   uint32_t* attribute_totals);
+									   uint64_t* attribute_totals);
 oknok_t calculate_attribute_totals_sub(const dataset_t* dataset, const dm_t* dm,
 									   const steps_t* steps,
 									   const word_t* covered_lines,
-									   uint32_t* attribute_totals);
+									   uint64_t* attribute_totals);
 /**
  * Sets this attribute as selected
  */
@@ -63,6 +62,6 @@ oknok_t mark_attribute_as_selected(word_t* selected_attributes,
  */
 
 oknok_t update_covered_lines(const word_t* best_column,
-							 const uint32_t n_words_in_a_column,
+							 const uint64_t n_words_in_a_column,
 							 word_t* covered_lines);
 #endif

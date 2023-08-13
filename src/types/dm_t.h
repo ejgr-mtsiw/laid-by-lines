@@ -17,22 +17,22 @@ typedef struct dm_t
 	/**
 	 * The number of lines of the full matrix
 	 */
-	uint32_t n_matrix_lines;
+	uint64_t n_matrix_lines;
 
 	/**
 	 * Number of words needed to store a column
 	 */
-	uint32_t n_words_in_a_column;
+	uint64_t n_words_in_a_column;
 
 	/**
 	 * The offset in the full matrix
 	 */
-	uint32_t s_offset;
+	uint64_t s_offset;
 
 	/**
 	 * Number of lines we can generate
 	 */
-	uint32_t s_size;
+	uint64_t s_size;
 } dm_t;
 
 #endif // DM_T_H

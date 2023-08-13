@@ -18,10 +18,10 @@
  */
 typedef struct class_offsets_t
 {
-	uint32_t classA;
-	uint32_t indexA;
-	uint32_t classB;
-	uint32_t indexB;
+	uint64_t classA;
+	uint64_t indexA;
+	uint64_t classB;
+	uint64_t indexB;
 } class_offsets_t;
 
 #endif /* TYPES_CLASS_OFFSETS_T_H_ */

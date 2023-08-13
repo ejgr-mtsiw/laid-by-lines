@@ -16,6 +16,6 @@
 /**
  * Calculates the number of lines for the disjoint matrix
  */
-uint32_t get_dm_n_lines(const dataset_t* dataset);
+uint64_t get_dm_n_lines(const dataset_t* dataset);
 
 #endif

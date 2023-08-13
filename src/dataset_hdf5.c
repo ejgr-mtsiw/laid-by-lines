@@ -74,8 +74,8 @@ oknok_t hdf5_open_dataset(const char* filename, const char* datasetname,
 
 oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 {
-	uint32_t n_classes = 0;
-	hdf5_read_attribute(dataset_id, N_CLASSES_ATTR, H5T_NATIVE_UINT32,
+	uint64_t n_classes = 0;
+	hdf5_read_attribute(dataset_id, N_CLASSES_ATTR, H5T_NATIVE_UINT64,
 						&n_classes);
 
 	if (n_classes < 2)
@@ -85,8 +85,8 @@ oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 	}
 
 	// Number of observations (lines) in the dataset
-	uint32_t n_observations = 0;
-	hdf5_read_attribute(dataset_id, N_OBSERVATIONS_ATTR, H5T_NATIVE_UINT32,
+	uint64_t n_observations = 0;
+	hdf5_read_attribute(dataset_id, N_OBSERVATIONS_ATTR, H5T_NATIVE_UINT64,
 						&n_observations);
 
 	if (n_observations < 2)
@@ -96,8 +96,8 @@ oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 	}
 
 	// Number of attributes in the dataset
-	uint32_t n_attributes = 0;
-	hdf5_read_attribute(dataset_id, N_ATTRIBUTES_ATTR, H5T_NATIVE_UINT32,
+	uint64_t n_attributes = 0;
+	hdf5_read_attribute(dataset_id, N_ATTRIBUTES_ATTR, H5T_NATIVE_UINT64,
 						&n_attributes);
 
 	if (n_attributes < 1)
@@ -113,8 +113,8 @@ oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 	dataset->n_classes		  = n_classes;
 	dataset->n_observations	  = n_observations;
 
-	uint32_t total_bits = dataset->n_attributes + dataset->n_bits_for_class;
-	uint32_t n_words = total_bits / WORD_BITS + (total_bits % WORD_BITS != 0);
+	uint64_t total_bits = dataset->n_attributes + dataset->n_bits_for_class;
+	uint64_t n_words = total_bits / WORD_BITS + (total_bits % WORD_BITS != 0);
 
 	dataset->n_words = n_words;
 

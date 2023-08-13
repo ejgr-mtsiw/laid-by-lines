@@ -22,7 +22,7 @@ oknok_t get_column(const dm_t* dm, const steps_t* steps, const int64_t index,
 {
 
 	// Which word has the index attribute
-	uint32_t index_word = index / WORD_BITS;
+	uint64_t index_word = index / WORD_BITS;
 
 	// Which bit?
 	uint8_t index_bit = WORD_BITS - (index % WORD_BITS) - 1;
@@ -30,7 +30,7 @@ oknok_t get_column(const dm_t* dm, const steps_t* steps, const int64_t index,
 	// Reset best_column
 	memset(column, 0, dm->n_words_in_a_column * sizeof(word_t));
 
-	for (uint32_t cs = 0; cs < dm->s_size; cs++)
+	for (uint64_t cs = 0; cs < dm->s_size; cs++)
 	{
 		word_t* la = steps[cs].lineA;
 		word_t* lb = steps[cs].lineB;
@@ -38,9 +38,8 @@ oknok_t get_column(const dm_t* dm, const steps_t* steps, const int64_t index,
 		word_t lxor = la[index_word] ^ lb[index_word];
 		if (BIT_CHECK(lxor, index_bit))
 		{
-
-			uint32_t w = cs / WORD_BITS;
-			uint32_t b = WORD_BITS - (cs % WORD_BITS) - 1;
+			uint64_t w = cs / WORD_BITS;
+			uint8_t b  = WORD_BITS - (cs % WORD_BITS) - 1;
 
 			BIT_SET(column[w], b);
 		}
