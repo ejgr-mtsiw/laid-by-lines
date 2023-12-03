@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <stdio.h>
 int64_t get_best_attribute_index(const uint64_t* totals,
 								 const uint64_t n_attributes)
 {
@@ -36,106 +37,115 @@ int64_t get_best_attribute_index(const uint64_t* totals,
 	return max_attribute;
 }
 
-oknok_t calculate_initial_attribute_totals(const dataset_t* dataset,
-										   const dm_t* dm, uint64_t* totals)
+oknok_t mark_attribute_as_selected(word_t* selected_attributes, const int64_t attribute)
 {
-	// Reset attributes totals
-	memset(totals, 0, dataset->n_attributes * sizeof(uint64_t));
 
-	uint64_t nc	   = dataset->n_classes;
-	uint64_t nobs  = dataset->n_observations;
-	word_t** opc   = dataset->observations_per_class;
-	uint64_t* nopc = dataset->n_observations_per_class;
+	// Which word has the best attribute
+	uint64_t best_word = attribute / WORD_BITS;
 
-	for (uint64_t cw = 0; cw < dataset->n_words; cw += N_WORDS_PER_CYCLE)
-	{
+	// Which bit?
+	uint8_t best_bit = WORD_BITS - attribute % WORD_BITS - 1;
 
-		uint64_t ew = cw + N_WORDS_PER_CYCLE;
-		if (ew > dataset->n_words)
-		{
-			ew = dataset->n_words;
-		}
-
-		uint64_t ca = dm->initial_class_offsets.classA;
-		uint64_t ia = dm->initial_class_offsets.indexA;
-		uint64_t cb = dm->initial_class_offsets.classB;
-		uint64_t ib = dm->initial_class_offsets.indexB;
-
-		uint64_t cl = 0;
-
-		while (ca < nc - 1 && cl < dm->s_size)
-		{
-			while (ia < nopc[ca] && cl < dm->s_size)
-			{
-				while (cb < nc && cl < dm->s_size)
-				{
-					while (ib < nopc[cb] && cl < dm->s_size)
-					{
-						// Add attributes totals
-
-						word_t** bla = opc + ca * nobs;
-						word_t* la	 = *(bla + ia);
-						word_t** blb = opc + cb * nobs;
-						word_t* lb	 = *(blb + ib);
-
-						/**
-						 * Current attribute
-						 */
-						uint64_t catt = cw * WORD_BITS;
-
-						// Process words
-						for (uint64_t ccw = cw; ccw < ew; ccw++)
-						{
-							word_t lxor = la[ccw] ^ lb[ccw];
-
-							for (int8_t bit = WORD_BITS - 1; bit >= 0;
-								 bit--, catt++)
-							{
-								totals[catt] += BIT_CHECK(lxor, bit);
-							}
-						}
-
-						ib++;
-						cl++;
-					}
-					cb++;
-					ib = 0;
-				}
-				ia++;
-				cb = ca + 1;
-				ib = 0;
-			}
-			ca++;
-			ia = 0;
-			cb = ca + 1;
-			ib = 0;
-		}
-	}
+	// Mark best attribute as selected
+	BIT_SET(selected_attributes[best_word], best_bit);
 
 	return OK;
 }
 
+
+//oknok_t calculate_initial_attribute_totals(const dataset_t* dataset,
+//										   const dm_t* dm, uint64_t* totals)
+//{
+//	// Reset attributes totals
+//	memset(totals, 0, dataset->n_attributes * sizeof(uint64_t));
+//
+//	uint64_t nc	   = dataset->n_classes;
+//	uint64_t nobs  = dataset->n_observations;
+//	word_t** opc   = dataset->observations_per_class;
+//	uint64_t* nopc = dataset->n_observations_per_class;
+//
+//	for (uint64_t cw = 0; cw < dataset->n_words; cw += N_WORDS_PER_CYCLE)
+//	{
+//
+//		uint64_t ew = cw + N_WORDS_PER_CYCLE;
+//		if (ew > dataset->n_words)
+//		{
+//			ew = dataset->n_words;
+//		}
+//
+//		uint64_t ca = dm->initial_class_offsets.classA;
+//		uint64_t ia = dm->initial_class_offsets.indexA;
+//		uint64_t cb = dm->initial_class_offsets.classB;
+//		uint64_t ib = dm->initial_class_offsets.indexB;
+//
+//		uint64_t cl = 0;
+//
+//		while (ca < nc - 1 && cl < dm->s_size)
+//		{
+//			while (ia < nopc[ca] && cl < dm->s_size)
+//			{
+//				while (cb < nc && cl < dm->s_size)
+//				{
+//					while (ib < nopc[cb] && cl < dm->s_size)
+//					{
+//						// Add attributes totals
+//
+//						word_t** bla = opc + ca * nobs;
+//						word_t* la	 = *(bla + ia);
+//						word_t** blb = opc + cb * nobs;
+//						word_t* lb	 = *(blb + ib);
+//
+//						/**
+//						 * Current attribute
+//						 */
+//						uint64_t catt = cw * WORD_BITS;
+//
+//						// Process words
+//						for (uint64_t ccw = cw; ccw < ew; ccw++)
+//						{
+//							word_t lxor = la[ccw] ^ lb[ccw];
+//
+//							for (int8_t bit = WORD_BITS - 1; bit >= 0;
+//								 bit--, catt++)
+//							{
+//								totals[catt] += BIT_CHECK(lxor, bit);
+//							}
+//						}
+//
+//						ib++;
+//						cl++;
+//					}
+//					cb++;
+//					ib = 0;
+//				}
+//				ia++;
+//				cb = ca + 1;
+//				ib = 0;
+//			}
+//			ca++;
+//			ia = 0;
+//			cb = ca + 1;
+//			ib = 0;
+//		}
+//	}
+//
+//	return OK;
+//}
+
 oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
 									   const word_t* covered_lines,
-									   uint64_t* totals)
+									   uint64_t* attribute_totals)
 {
+
+	uint64_t nw = dataset->n_words;
+	uint64_t nc	= dataset->n_classes;
+	line_class_t *classes = dataset->classes;
+
 	// Reset attributes totals
-	memset(totals, 0, dataset->n_attributes * sizeof(uint64_t));
+	memset(attribute_totals, 0, dataset->n_words * WORD_BITS * sizeof(uint64_t));
 
-	uint64_t nc	   = dataset->n_classes;
-	uint64_t nobs  = dataset->n_observations;
-	word_t** opc   = dataset->observations_per_class;
-	uint64_t* nopc = dataset->n_observations_per_class;
-
-	for (uint64_t cw = 0; cw < dataset->n_words; cw += N_WORDS_PER_CYCLE)
+	for (uint64_t cw = 0; cw < dataset->n_words-1; cw += N_WORDS_PER_CYCLE)
 	{
-
-		uint64_t ew = cw + N_WORDS_PER_CYCLE;
-		if (ew > dataset->n_words)
-		{
-			ew = dataset->n_words;
-		}
-
 		uint64_t ca = dm->initial_class_offsets.classA;
 		uint64_t ia = dm->initial_class_offsets.indexA;
 		uint64_t cb = dm->initial_class_offsets.classB;
@@ -145,12 +155,13 @@ oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
 
 		while (ca < nc - 1 && cl < dm->s_size)
 		{
-			while (ia < nopc[ca] && cl < dm->s_size)
+			while (ia < classes[ca].n_observations && cl < dm->s_size)
 			{
 				while (cb < nc && cl < dm->s_size)
 				{
-					while (ib < nopc[cb] && cl < dm->s_size)
+					while (ib < classes[cb].n_observations && cl < dm->s_size)
 					{
+
 						/**
 						 * Is this line covered?
 						 * Yes: skip
@@ -164,11 +175,8 @@ oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
 						{
 							// This line is uncovered: calculate attributes
 							// totals
-
-							word_t** bla = opc + ca * nobs;
-							word_t* la	 = *(bla + ia);
-							word_t** blb = opc + cb * nobs;
-							word_t* lb	 = *(blb + ib);
+							word_t* la = classes[ca].first_observation_address + ia*nw+cw;
+							word_t* lb = classes[cb].first_observation_address + ib*nw+cw;
 
 							/**
 							 * Current attribute
@@ -176,18 +184,16 @@ oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
 							uint64_t catt = cw * WORD_BITS;
 
 							// Process words
-							for (uint64_t ccw = cw; ccw < ew; ccw++)
+							for (uint64_t ccw = 0; ccw < N_WORDS_PER_CYCLE; ccw++)
 							{
 								word_t lxor = la[ccw] ^ lb[ccw];
 
-								for (int8_t bit = WORD_BITS - 1; bit >= 0;
-									 bit--, catt++)
+								for (int8_t bit = WORD_BITS - 1; bit >= 0; bit--, catt++)
 								{
-									totals[catt] += BIT_CHECK(lxor, bit);
+									attribute_totals[catt] += BIT_CHECK(lxor, bit);
 								}
 							}
 						}
-
 						ib++;
 						cl++;
 					}
@@ -207,103 +213,85 @@ oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
 
 	return OK;
 }
+
+
 oknok_t calculate_attribute_totals_sub(const dataset_t* dataset, const dm_t* dm,
 									   const word_t* covered_lines,
-									   uint64_t* totals)
+									   uint64_t* attribute_totals)
 {
-	uint64_t nc	   = dataset->n_classes;
-	uint64_t nobs  = dataset->n_observations;
-	word_t** opc   = dataset->observations_per_class;
-	uint64_t* nopc = dataset->n_observations_per_class;
 
-	for (uint64_t cw = 0; cw < dataset->n_words; cw += N_WORDS_PER_CYCLE)
-	{
+	uint64_t nw = dataset->n_words;
+		uint64_t nc	= dataset->n_classes;
+		line_class_t *classes = dataset->classes;
 
-		uint64_t ew = cw + N_WORDS_PER_CYCLE;
-		if (ew > dataset->n_words)
+		for (uint64_t cw = 0; cw < dataset->n_words-1; cw += N_WORDS_PER_CYCLE)
 		{
-			ew = dataset->n_words;
-		}
+			uint64_t ca = dm->initial_class_offsets.classA;
+			uint64_t ia = dm->initial_class_offsets.indexA;
+			uint64_t cb = dm->initial_class_offsets.classB;
+			uint64_t ib = dm->initial_class_offsets.indexB;
 
-		uint64_t ca = dm->initial_class_offsets.classA;
-		uint64_t ia = dm->initial_class_offsets.indexA;
-		uint64_t cb = dm->initial_class_offsets.classB;
-		uint64_t ib = dm->initial_class_offsets.indexB;
+			uint64_t cl = 0;
 
-		uint64_t cl = 0;
-
-		while (ca < nc - 1 && cl < dm->s_size)
-		{
-			while (ia < nopc[ca] && cl < dm->s_size)
+			while (ca < nc - 1 && cl < dm->s_size)
 			{
-				while (cb < nc && cl < dm->s_size)
+				while (ia < classes[ca].n_observations && cl < dm->s_size)
 				{
-					while (ib < nopc[cb] && cl < dm->s_size)
+					while (cb < nc && cl < dm->s_size)
 					{
-						/**
-						 * Is this line covered?
-						 * Yes: sub
-						 * No: skip
-						 */
-						uint64_t clw = cl / WORD_BITS;
-						uint8_t clb	 = WORD_BITS - cl % WORD_BITS - 1;
-
-						// Is this line not covered?
-						if (BIT_CHECK(covered_lines[clw], clb))
+						while (ib < classes[cb].n_observations && cl < dm->s_size)
 						{
-							// This line is covered: calculate attributes totals
-
-							word_t** bla = opc + ca * nobs;
-							word_t* la	 = *(bla + ia);
-							word_t** blb = opc + cb * nobs;
-							word_t* lb	 = *(blb + ib);
 
 							/**
-							 * Current attribute
+							 * Is this line covered?
+							 * Yes: skip
+							 * No: add
 							 */
-							uint64_t catt = cw * WORD_BITS;
+							uint64_t cl_word = cl / WORD_BITS;
+							uint8_t cl_bit	 = WORD_BITS - cl % WORD_BITS - 1;
 
-							// Process words
-							for (uint64_t ccw = cw; ccw < ew; ccw++)
+							// Is this line newly covered?
+							if (BIT_CHECK(covered_lines[cl_word], cl_bit))
 							{
-								word_t lxor = la[ccw] ^ lb[ccw];
+								// This line is covered: update attributes
+								// totals
+								word_t* la = classes[ca].first_observation_address + ia*nw+cw;
+								word_t* lb = classes[cb].first_observation_address + ib*nw+cw;
 
-								for (int8_t bit = WORD_BITS - 1; bit >= 0;
-									 bit--, catt++)
+								/**
+								 * Current attribute
+								 */
+								uint64_t catt = cw * WORD_BITS;
+
+								// Process words
+								for (uint64_t ccw = 0; ccw < N_WORDS_PER_CYCLE; ccw++)
 								{
-									totals[catt] -= BIT_CHECK(lxor, bit);
+									word_t lxor = la[ccw] ^ lb[ccw];
+
+									for (int8_t bit = WORD_BITS - 1; bit >= 0; bit--, catt++)
+									{
+										attribute_totals[catt] -= BIT_CHECK(lxor, bit);
+									}
 								}
 							}
+							ib++;
+							cl++;
 						}
-
-						ib++;
-						cl++;
+						cb++;
+						ib = 0;
 					}
-					cb++;
+					ia++;
+					cb = ca + 1;
 					ib = 0;
 				}
-				ia++;
+				ca++;
+				ia = 0;
 				cb = ca + 1;
 				ib = 0;
 			}
-			ca++;
-			ia = 0;
-			cb = ca + 1;
-			ib = 0;
 		}
-	}
 
-	return OK;
-}
-
-oknok_t mark_attribute_as_selected(word_t* attributes, int64_t attribute)
-{
-	uint64_t attribute_word = attribute / WORD_BITS;
-	uint8_t attribute_bit	= WORD_BITS - (attribute % WORD_BITS) - 1;
-
-	BIT_SET(attributes[attribute_word], attribute_bit);
-
-	return OK;
+		return OK;
 }
 
 oknok_t update_covered_lines(const word_t* best_column,

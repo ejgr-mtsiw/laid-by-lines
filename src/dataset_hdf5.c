@@ -6,7 +6,9 @@
  ============================================================================
  */
 
+#include "dataset.h"
 #include "dataset_hdf5.h"
+#include "utils/math.h"
 
 #include "types/dataset_t.h"
 #include "types/oknok_t.h"
@@ -19,29 +21,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-bool hdf5_dataset_exists(const hid_t file_id, const char* datasetname)
-{
-	return (H5Lexists(file_id, datasetname, H5P_DEFAULT) > 0);
-}
-
-bool hdf5_file_has_dataset(const char* filename, const char* datasetname)
-{
-	// Open the data file
-	hid_t file_id = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
-	if (file_id < 1)
-	{
-		// Error creating file
-		fprintf(stderr, "Error opening file %s\n", filename);
-		return false;
-	}
-
-	bool exists = hdf5_dataset_exists(file_id, datasetname);
-
-	H5Fclose(file_id);
-
-	return exists;
-}
+#include <string.h>
 
 oknok_t hdf5_open_dataset(const char* filename, const char* datasetname,
 						  dataset_hdf5_t* dataset)
@@ -74,8 +54,8 @@ oknok_t hdf5_open_dataset(const char* filename, const char* datasetname,
 
 oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 {
-	uint64_t n_classes = 0;
-	hdf5_read_attribute(dataset_id, N_CLASSES_ATTR, H5T_NATIVE_UINT64,
+	uint32_t n_classes = 0;
+	hdf5_read_attribute(dataset_id, N_CLASSES_ATTR, H5T_NATIVE_UINT,
 						&n_classes);
 
 	if (n_classes < 2)
@@ -84,9 +64,9 @@ oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 		return NOK;
 	}
 
+	uint32_t n_observations = 0;
 	// Number of observations (lines) in the dataset
-	uint64_t n_observations = 0;
-	hdf5_read_attribute(dataset_id, N_OBSERVATIONS_ATTR, H5T_NATIVE_UINT64,
+	hdf5_read_attribute(dataset_id, N_OBSERVATIONS_ATTR, H5T_NATIVE_UINT,
 						&n_observations);
 
 	if (n_observations < 2)
@@ -95,9 +75,9 @@ oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 		return NOK;
 	}
 
+	uint32_t n_attributes = 0;
 	// Number of attributes in the dataset
-	uint64_t n_attributes = 0;
-	hdf5_read_attribute(dataset_id, N_ATTRIBUTES_ATTR, H5T_NATIVE_UINT64,
+	hdf5_read_attribute(dataset_id, N_ATTRIBUTES_ATTR, H5T_NATIVE_UINT,
 						&n_attributes);
 
 	if (n_attributes < 1)
@@ -113,10 +93,20 @@ oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset)
 	dataset->n_classes		  = n_classes;
 	dataset->n_observations	  = n_observations;
 
+	// Bits needed for attributes and jnsq (max)
 	uint64_t total_bits = dataset->n_attributes + dataset->n_bits_for_class;
+
+	// Round up to the nearest multiple of 512
+	// 512 bits = 1 cache line
+	total_bits=roundUp(total_bits, 512);
+
+	// How many words (64 bits) will be allocated
 	uint64_t n_words = total_bits / WORD_BITS + (total_bits % WORD_BITS != 0);
 
-	dataset->n_words = n_words;
+	// Add one word for the line class
+	n_words++;
+
+	dataset->n_words=n_words;
 
 	return OK;
 }
@@ -147,7 +137,7 @@ oknok_t hdf5_read_attribute(hid_t dataset_id, const char* attribute,
 		return NOK;
 	}
 
-	// Read the attribute value
+	// read the attribute value
 	status = H5Aread(attr, datatype, value);
 	if (status < 0)
 	{
@@ -155,7 +145,7 @@ oknok_t hdf5_read_attribute(hid_t dataset_id, const char* attribute,
 		return NOK;
 	}
 
-	// Close the attribute
+	// close the attribute
 	status = H5Aclose(attr);
 	if (status < 0)
 	{
@@ -169,7 +159,7 @@ oknok_t hdf5_read_attribute(hid_t dataset_id, const char* attribute,
 oknok_t hdf5_read_dataset_data(hid_t dataset_id, word_t* data)
 {
 	// Fill dataset from hdf5 file
-	herr_t status = H5Dread(dataset_id, H5T_NATIVE_UINT64, H5S_ALL, H5S_ALL,
+	herr_t status = H5Dread(dataset_id, H5T_NATIVE_ULONG, H5S_ALL, H5S_ALL,
 							H5P_DEFAULT, data);
 
 	if (status < 0)
@@ -199,4 +189,69 @@ void hdf5_close_dataset(dataset_hdf5_t* dataset)
 {
 	H5Dclose(dataset->dataset_id);
 	H5Fclose(dataset->file_id);
+}
+
+oknok_t hdf5_read_dataset_data_by_line(dataset_hdf5_t* hdf5_dataset, dataset_t *dataset)
+{
+	uint64_t n_words=dataset->n_words;
+	word_t*buffer=(word_t*)malloc(n_words*sizeof(word_t));
+	uint64_t line_class=0;
+
+	uint64_t file_n_words = hdf5_dataset->dimensions[1];
+
+	for (uint64_t l = 0;l < dataset->n_observations;l++){
+		hdf5_read_line(hdf5_dataset, l, file_n_words, buffer);
+		line_class=get_class(buffer, dataset->n_attributes, file_n_words, dataset->n_bits_for_class);
+
+		memcpy(dataset->data+l*n_words, buffer, file_n_words*sizeof(word_t));
+		dataset->data[(l+1)*n_words-1]=line_class;
+//
+//		printf("\n[%lu] lc[%lu] lc2[%lu]\n", l, line_class, dataset->data[(l+1)*n_words-1]);
+//
+//		for (uint64_t i=0;i<file_n_words;i++){
+//			printf("[%lu] b[%lu] d[%lu]\n",i, buffer[i], dataset->data[l*n_words+i]);
+//		}
+	}
+
+	free(buffer);
+
+	return OK;
+}
+
+oknok_t hdf5_read_line(const dataset_hdf5_t* dataset, const uint32_t index,
+					   const uint32_t n_words, word_t* line)
+{
+	return hdf5_read_lines(dataset, index, n_words, 1, line);
+}
+
+oknok_t hdf5_read_lines(const dataset_hdf5_t* dataset, const uint32_t index,
+						const uint32_t n_words, const uint32_t n_lines,
+						word_t* lines)
+{
+	// Setup offset
+	hsize_t offset[2] = { index, 0 };
+
+	// Setup count
+	hsize_t count[2] = { n_lines, n_words };
+
+	const hsize_t dimensions[2] = { n_lines, n_words };
+
+	// Create a memory dataspace to indicate the size of our buffer/chunk
+	hid_t memspace_id = H5Screate_simple(2, dimensions, NULL);
+
+	// Setup line dataspace
+	hid_t dataspace_id = H5Dget_space(dataset->dataset_id);
+
+	// Select hyperslab on file dataset
+	H5Sselect_hyperslab(dataspace_id, H5S_SELECT_SET, offset, NULL, count,
+						NULL);
+
+	// Read line from dataset
+	H5Dread(dataset->dataset_id, H5T_NATIVE_UINT64, memspace_id, dataspace_id,
+			H5P_DEFAULT, lines);
+
+	H5Sclose(dataspace_id);
+	H5Sclose(memspace_id);
+
+	return OK;
 }

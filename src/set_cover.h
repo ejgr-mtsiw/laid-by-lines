@@ -33,20 +33,18 @@ int64_t get_best_attribute_index(const uint64_t* totals,
 /**
  * Calculates the current attributes totals
  */
-oknok_t calculate_initial_attribute_totals(const dataset_t* dataset,
-										   const dm_t* dm, uint64_t* totals);
-
 oknok_t calculate_attribute_totals_add(const dataset_t* dataset, const dm_t* dm,
 									   const word_t* covered_lines,
-									   uint64_t* totals);
+									   uint64_t* attribute_totals);
+
 oknok_t calculate_attribute_totals_sub(const dataset_t* dataset, const dm_t* dm,
 									   const word_t* covered_lines,
-									   uint64_t* totals);
+									   uint64_t* attribute_totals);
 
 /**
  * Sets this attribute as selected
  */
-oknok_t mark_attribute_as_selected(word_t* attributes, int64_t attribute);
+oknok_t mark_attribute_as_selected(word_t* selected_attributes,const int64_t attribute);
 
 /**
  * Updates the list of covered lines, adding the lines covered by the best

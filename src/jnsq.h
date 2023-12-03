@@ -16,13 +16,13 @@
 
 /**
  * Replaces the class bits with jnsq bits
- * It's ok, because the number of jnsq bits is always <= bits needed
- * for class and we don't need the class anymore because
- * we extracted it to the dataset_line structure.
+ * It's ok, because the number of jnsq bits is always <= bits needed for class
+ * And we don't need the class anymore because we extracted it to the
+ * dataset_line structure.
  * And we fill the bits in reverse jnsq=1 with 3bits = 1 0 0
  * So the extra bits are zeroed and can be ignored in the calculations
  *
- * Also inconsistency = class (?)
+ * Also inconsistency = class
  * See Apolónia, J., & Cavique, L. (2019). Seleção de Atributos de Dados
  * Inconsistentes em ambiente HDF5+ Python na cloud INCD. Revista de
  * Ciências da Computação, 85-112.
@@ -33,8 +33,6 @@ void set_jnsq_bits(word_t* line, uint64_t inconsistency,
 
 /**
  * Adds the JNSQs attributes to the dataset.
- * The dataset must be sorted and not have any duplicates in it
- *
  * Returns max inconsistency found
  */
 uint64_t add_jnsqs(dataset_t* dataset);

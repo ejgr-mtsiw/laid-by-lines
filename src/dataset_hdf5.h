@@ -15,7 +15,6 @@
 
 #include "hdf5.h"
 
-#include <stdbool.h>
 #include <stdint.h>
 
 /**
@@ -34,21 +33,10 @@
 #define N_OBSERVATIONS_ATTR "n_observations"
 
 /**
- * Checks if dataset is present in file_id
- */
-bool hdf5_dataset_exists(const hid_t file_id, const char* dataset);
-
-/**
- * Checks if dataset is present from filename
- */
-bool hdf5_file_has_dataset(const char* filename, const char* datasetname);
-
-/**
  * Opens the file and dataset indicated
  */
 oknok_t hdf5_open_dataset(const char* filename, const char* datasetname,
 						  dataset_hdf5_t* dataset);
-
 /**
  * Reads the dataset attributes from the hdf5 file
  */
@@ -59,7 +47,6 @@ oknok_t hdf5_read_dataset_attributes(hid_t dataset_id, dataset_t* dataset);
  */
 oknok_t hdf5_read_attribute(hid_t dataset_id, const char* attribute,
 							hid_t datatype, void* value);
-
 /**
  * Reads the entire dataset data from the hdf5 file
  */
@@ -74,5 +61,20 @@ void hdf5_get_dataset_dimensions(hid_t dataset_id, hsize_t* dataset_dimensions);
  * Free resources and closes open connections
  */
 void hdf5_close_dataset(dataset_hdf5_t* dataset);
+
+oknok_t hdf5_read_dataset_data_by_line(dataset_hdf5_t* hdf5_dataset, dataset_t *dataset);
+
+/**
+ * Retrieves a line from the dataset
+ */
+oknok_t hdf5_read_line(const dataset_hdf5_t* dataset, const uint32_t index,
+					   const uint32_t n_words, word_t* line);
+
+/**
+ * Reads n lines from the dataset
+ */
+oknok_t hdf5_read_lines(const dataset_hdf5_t* dataset, const uint32_t index,
+						const uint32_t n_words, const uint32_t n_lines,
+						word_t* lines);
 
 #endif

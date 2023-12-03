@@ -65,8 +65,7 @@
  * Global root
  *  - Show solution
  */
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
 	/**
 	 * Command line arguments set by the user
 	 */
@@ -75,16 +74,14 @@ int main(int argc, char** argv)
 	/**
 	 * Parse command line arguments
 	 */
-	if (read_args(argc, argv, &args) == READ_CL_ARGS_NOK)
-	{
+	if (read_args(argc, argv, &args) == READ_CL_ARGS_NOK) {
 		return EXIT_FAILURE;
 	}
 
 	/*
 	 * Initialize MPI
 	 */
-	if (MPI_Init(&argc, &argv) != MPI_SUCCESS)
-	{
+	if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
 		printf("Error initializing MPI environment!\n");
 		return EXIT_FAILURE;
 	}
@@ -120,7 +117,7 @@ int main(int argc, char** argv)
 	 * This communicator is used to share memory with processes intranode
 	 */
 	MPI_Comm_split_type(comm, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL,
-						&node_comm);
+			&node_comm);
 
 	/**
 	 * In-node rank of process
@@ -141,12 +138,14 @@ int main(int argc, char** argv)
 	/**
 	 * Timing for the full operation
 	 */
-	SETUP_TIMING_GLOBAL;
+	SETUP_TIMING_GLOBAL
+	;
 
 	/**
 	 * Local timing structures
 	 */
-	SETUP_TIMING;
+	SETUP_TIMING
+	;
 
 	/**
 	 * The dataset
@@ -171,37 +170,31 @@ int main(int argc, char** argv)
 	 */
 	uint64_t shared_data_size = 0;
 
-	if (node_rank == LOCAL_ROOT_RANK)
-	{
-		if (hdf5_open_dataset(args.filename, args.datasetname, &hdf5_dset)
-			== NOK)
-		{
+	if (node_rank == LOCAL_ROOT_RANK) {
+		if (hdf5_open_dataset(args.filename, args.datasetname,
+				&hdf5_dset) == NOK) {
 			return EXIT_FAILURE;
 		}
 
-		dataset.n_observations = hdf5_dset.dimensions[0];
-		dataset.n_words		   = hdf5_dset.dimensions[1];
+		// Load dataset attributes
+		hdf5_read_dataset_attributes(hdf5_dset.dataset_id, &dataset);
 
 		shared_data_size = dataset.n_observations * dataset.n_words;
 	}
 
-	word_t* dset_data		= NULL;
+	word_t *dset_data = NULL;
 	MPI_Win win_shared_dset = MPI_WIN_NULL;
 	MPI_Win_allocate_shared(shared_data_size * sizeof(word_t), sizeof(word_t),
-							MPI_INFO_NULL, node_comm, &dset_data,
-							&win_shared_dset);
+	MPI_INFO_NULL, node_comm, &dset_data, &win_shared_dset);
 
 	// Set dataset data pointer
-	if (node_rank == LOCAL_ROOT_RANK)
-	{
+	if (node_rank == LOCAL_ROOT_RANK) {
 		dataset.data = dset_data;
-	}
-	else
-	{
+	} else {
 		MPI_Aint win_size;
 		int win_disp;
 		MPI_Win_shared_query(win_shared_dset, LOCAL_ROOT_RANK, &win_size,
-							 &win_disp, &dataset.data);
+				&win_disp, &dataset.data);
 	}
 	// All dataset.data pointers should now point to copy on noderank 0
 
@@ -212,15 +205,13 @@ int main(int argc, char** argv)
 	ROOT_SAYS("Reading dataset: ");
 	TICK;
 
-	if (node_rank == LOCAL_ROOT_RANK)
-	{
-		// Load dataset attributes
-		hdf5_read_dataset_attributes(hdf5_dset.dataset_id, &dataset);
-
+	if (node_rank == LOCAL_ROOT_RANK) {
 		// Load dataset data
-		hdf5_read_dataset_data(hdf5_dset.dataset_id, dataset.data);
+		hdf5_read_dataset_data_by_line(&hdf5_dset, &dataset);
 
 		TOCK;
+
+		print_dataset(&dataset, dataset.n_attributes, dataset.n_observations);
 
 		// Print dataset details
 		ROOT_SHOWS("  Classes = %lu", dataset.n_classes);
@@ -240,10 +231,12 @@ int main(int argc, char** argv)
 		 * so we can't use the standard qsort implementation
 		 */
 		sort_r(dataset.data, dataset.n_observations,
-			   dataset.n_words * sizeof(word_t), compare_lines_extra,
-			   &dataset.n_words);
+				dataset.n_words * sizeof(word_t), compare_lines_extra,
+				&dataset.n_words);
 
 		TOCK;
+
+		print_dataset(&dataset, dataset.n_attributes, dataset.n_observations);
 
 		// Remove duplicates
 		ROOT_SAYS("Removing duplicates: ");
@@ -253,70 +246,17 @@ int main(int argc, char** argv)
 
 		TOCK;
 		ROOT_SHOWS("  %lu duplicate(s) removed\n", duplicates);
-	}
 
-	// Share current dataset attributes
-	MPI_Bcast(&(dataset.n_attributes), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
-			  node_comm);
-	MPI_Bcast(&(dataset.n_observations), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
-			  node_comm);
-	MPI_Bcast(&(dataset.n_classes), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
-			  node_comm);
-	MPI_Bcast(&(dataset.n_bits_for_class), 1, MPI_UINT8_T, LOCAL_ROOT_RANK,
-			  node_comm);
-	MPI_Bcast(&(dataset.n_words), 1, MPI_UINT64_T, LOCAL_ROOT_RANK, node_comm);
+		print_dataset(&dataset, dataset.n_attributes, dataset.n_observations);
 
-	// Fill class arrays
-	ROOT_SAYS("Checking classes: ");
-	TICK;
-
-	/**
-	 * Array that stores the number of observations for each class
-	 */
-	dataset.n_observations_per_class
-		= (uint64_t*) calloc(dataset.n_classes, sizeof(uint64_t));
-	assert(dataset.n_observations_per_class != NULL);
-
-	/**
-	 * Matrix that stores the list of observations per class
-	 */
-	dataset.observations_per_class = (word_t**) calloc(
-		dataset.n_classes * dataset.n_observations, sizeof(word_t*));
-	assert(dataset.observations_per_class != NULL);
-
-	// Must make sure the dataset is filled before proceeding
-	MPI_Barrier(node_comm);
-
-	if (fill_class_arrays(&dataset) != OK)
-	{
-		return EXIT_FAILURE;
-	}
-
-	TOCK;
-
-	if (rank == ROOT_RANK)
-	{
-		for (uint64_t i = 0; i < dataset.n_classes; i++)
-		{
-			ROOT_SHOWS("  Class %lu: ", i);
-			ROOT_SHOWS("%lu item(s)\n", dataset.n_observations_per_class[i]);
-		}
-	}
-
-	// Must make sure everyone has finished before changing the dataset
-	MPI_Barrier(node_comm);
-
-	// Set JNSQ
-	if (node_rank == LOCAL_ROOT_RANK)
-	{
+		// Set JNSQ
 		ROOT_SAYS("Setting up JNSQ attributes: ");
 		TICK;
 
 		uint64_t max_inconsistency = add_jnsqs(&dataset);
 
 		// Update number of bits needed for jnsqs
-		if (max_inconsistency > 0)
-		{
+		if (max_inconsistency > 0) {
 			// How many bits are needed for jnsq attributes
 			uint8_t n_bits_for_jnsq = ceil(log2(max_inconsistency + 1));
 
@@ -326,27 +266,68 @@ int main(int argc, char** argv)
 		TOCK;
 		ROOT_SHOWS("  Max JNSQ: %lu", max_inconsistency);
 		ROOT_SHOWS(" [%d bits]\n", dataset.n_bits_for_jnsqs);
+
+		// JNSQ attributes are treated just like all the other attributes from
+		// this point forward
+		dataset.n_attributes += dataset.n_bits_for_jnsqs;
+
+		print_dataset(&dataset, dataset.n_attributes, dataset.n_observations);
+
+		// Sort dataset by class
+		ROOT_SAYS("Sorting dataset by class: ");
+		TICK;
+
+		/**
+		 * We need to sort by the class word
+		 * so we can't use the standard qsort implementation
+		 */
+		sort_r(dataset.data, dataset.n_observations,
+				dataset.n_words * sizeof(word_t), compare_lines_by_class,
+				&dataset.n_words);
+
+		TOCK;
+
+		print_dataset(&dataset, dataset.n_attributes, dataset.n_observations);
 	}
 
-	// Update dataset data because only node_root knows if we added jnsqs
+	/// Must make sure the dataset is filled before proceeding
+	MPI_Barrier(node_comm);
+
+	// Share current dataset attributes
+	MPI_Bcast(&(dataset.n_attributes), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
+			node_comm);
+	MPI_Bcast(&(dataset.n_observations), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
+			node_comm);
+	MPI_Bcast(&(dataset.n_classes), 1, MPI_UINT64_T, LOCAL_ROOT_RANK,
+			node_comm);
+	MPI_Bcast(&(dataset.n_bits_for_class), 1, MPI_UINT8_T, LOCAL_ROOT_RANK,
+			node_comm);
 	MPI_Bcast(&(dataset.n_bits_for_jnsqs), 1, MPI_UINT8_T, LOCAL_ROOT_RANK,
-			  node_comm);
+			node_comm);
+	MPI_Bcast(&(dataset.n_words), 1, MPI_UINT64_T, LOCAL_ROOT_RANK, node_comm);
 
-	// JNSQ attributes are treated just like all the other attributes from
-	// this point forward
-	dataset.n_attributes += dataset.n_bits_for_jnsqs;
+	// Fill class arrays
+	ROOT_SAYS("Checking classes: ");
+	TICK;
 
-	// n_words may have changed?
-	// If we have 5 classes (3 bits) and only one bit is in the last word
-	// If we only use 2 bits for jnsqs then we need one less n_words
-	// This could impact all the calculations that assume n_words - 1
-	// is the last word!
-	dataset.n_words = dataset.n_attributes / WORD_BITS
-		+ (dataset.n_attributes % WORD_BITS != 0);
+	dataset.classes = (line_class_t*) calloc(dataset.n_classes, sizeof(line_class_t));
+	if (fill_class_arrays(&dataset) != OK) {
+		return EXIT_FAILURE;
+	}
+
+	TOCK;
+
+	if (rank == ROOT_RANK) {
+		for (uint64_t i = 0; i < dataset.n_classes; i++) {
+			ROOT_SHOWS("  Class %lu: ", i);
+			ROOT_SHOWS("%lu item(s)\n", dataset.classes[i].n_observations);
+		}
+	}
 
 	// End setup dataset
 
-	MPI_Barrier(node_comm);
+	//// Must make sure everyone has finished before changing the dataset
+	//MPI_Barrier(node_comm);
 
 	// Setup disjoint matrix
 
@@ -363,34 +344,29 @@ int main(int argc, char** argv)
 
 	// Calculate the offset and number of lines for this process
 	dm.s_offset = BLOCK_LOW(rank, size, dm.n_matrix_lines);
-	dm.s_size	= BLOCK_SIZE(rank, size, dm.n_matrix_lines);
+	dm.s_size = BLOCK_SIZE(rank, size, dm.n_matrix_lines);
 
 	// Calculate initial offsets for each process
 	calculate_class_offsets(&dataset, dm.s_offset, &dm.initial_class_offsets);
 
 	TOCK;
 
-	if (rank == ROOT_RANK)
-	{
+	if (rank == ROOT_RANK) {
 		double matrix_size = ((double) dm.n_matrix_lines * dataset.n_attributes)
-			/ (1024.0 * 1024 * 1024 * 8);
+				/ (1024.0 * 1024 * 1024 * 8);
 		ROOT_SHOWS("  Estimated disjoint matrix size: %3.2fGB\n", matrix_size);
 
 		fprintf(stdout, "  Number of lines in the disjoint matrix: %lu\n",
 				dm.n_matrix_lines);
 
-		for (int r = 0; r < size; r++)
-		{
+		for (int r = 0; r < size; r++) {
 			uint64_t s_offset = BLOCK_LOW(r, size, dm.n_matrix_lines);
-			uint64_t s_size	  = BLOCK_SIZE(r, size, dm.n_matrix_lines);
-			if (s_size > 0)
-			{
+			uint64_t s_size = BLOCK_SIZE(r, size, dm.n_matrix_lines);
+			if (s_size > 0) {
 				fprintf(stdout,
 						"    Process %d will generate %lu lines [%lu -> %lu]\n",
 						r, s_size, s_offset, s_offset + s_size - 1);
-			}
-			else
-			{
+			} else {
 				fprintf(stdout, "    Process %d will generate 0 lines\n", r);
 			}
 		}
@@ -432,20 +408,17 @@ int main(int argc, char** argv)
 	/**
 	 * Number of words needed to store a column (attribute data)
 	 */
-	dm.n_words_in_a_column
-		= dm.s_size / WORD_BITS + (dm.s_size % WORD_BITS != 0);
+	dm.n_words_in_a_column = dm.s_size / WORD_BITS + (dm.s_size % WORD_BITS != 0);
 
 	/**
 	 * The best attribute data bit array
 	 */
-	word_t* best_column
-		= (word_t*) calloc(dm.n_words_in_a_column, sizeof(word_t));
+	word_t *best_column = (word_t*) calloc(dm.n_words_in_a_column, sizeof(word_t));
 
 	/**
 	 * The covered lines bit array
 	 */
-	word_t* covered_lines
-		= (word_t*) calloc(dm.n_words_in_a_column, sizeof(word_t));
+	word_t *covered_lines = (word_t*) calloc(dm.n_words_in_a_column, sizeof(word_t));
 
 	/**
 	 * Number of uncovered lines.
@@ -457,8 +430,7 @@ int main(int argc, char** argv)
 	 * Use n_words instead of n_attributes to avoid extra
 	 * verifications on last word
 	 */
-	uint64_t* attribute_totals
-		= (uint64_t*) calloc(dataset.n_words * WORD_BITS, sizeof(uint64_t));
+	uint64_t *attribute_totals = (uint64_t*) calloc(dataset.n_words * WORD_BITS, sizeof(uint64_t));
 
 	/**
 	 * Global totals. Only root needs these
@@ -469,47 +441,51 @@ int main(int argc, char** argv)
 	 * Use n_words instead of n_attributes on allocation to avoid
 	 * extra verifications on last word
 	 */
-	uint64_t* global_attribute_totals = NULL;
+	uint64_t *global_attribute_totals = NULL;
 
 	/**
 	 * Selected attributes bit array aka the solution
 	 */
-	word_t* selected_attributes = NULL;
+	word_t *selected_attributes = NULL;
 
 	/**
 	 * Number of uncovered lines in the full matrix. Only root needs this.
 	 */
 	uint64_t global_n_uncovered_lines = dm.n_matrix_lines;
 
-	if (rank == ROOT_RANK)
-	{
-		global_attribute_totals
-			= (uint64_t*) calloc(dataset.n_words * WORD_BITS, sizeof(uint64_t));
+	if (rank == ROOT_RANK) {
+		global_attribute_totals = (uint64_t*) calloc( dataset.n_words * WORD_BITS, sizeof(uint64_t));
 
 		selected_attributes = (word_t*) calloc(dataset.n_words, sizeof(word_t));
 	}
 
 	// Calculate the totals for all attributes
-	calculate_initial_attribute_totals(&dataset, &dm, attribute_totals);
+	calculate_attribute_totals_add(&dataset, &dm, covered_lines, attribute_totals);
 
-	while (true)
-	{
+//	for (uint64_t a=0;a<10; a++){
+//		printf("%lu ", attribute_totals[a]);
+//	}
+//
+//	printf("\n");
+
+	while (true) {
 		// Calculate global totals
-		MPI_Reduce(attribute_totals, global_attribute_totals,
-				   dataset.n_attributes, MPI_UINT64_T, MPI_SUM, ROOT_RANK,
-				   comm);
+		MPI_Reduce(attribute_totals, global_attribute_totals, dataset.n_attributes, MPI_UINT64_T, MPI_SUM, ROOT_RANK, comm);
+
+//		for (uint64_t a=0;a<10; a++){
+//			printf("%lu ", global_attribute_totals[a]);
+//		}
+//
+//		printf("\n");
 
 		// Get best attribute index
 		int64_t best_attribute = -1;
 
-		if (rank == ROOT_RANK)
-		{
-			best_attribute = get_best_attribute_index(global_attribute_totals,
-													  dataset.n_attributes);
+		if (rank == ROOT_RANK) {
+			best_attribute = get_best_attribute_index(global_attribute_totals, dataset.n_attributes);
 
 			ROOT_SHOWS("  Selected attribute #%ld, ", best_attribute);
-			ROOT_SHOWS("covers %lu lines ",
-					   global_attribute_totals[best_attribute]);
+			ROOT_SHOWS("covers %lu lines ", global_attribute_totals[best_attribute]);
 			TOCK;
 			TICK;
 
@@ -520,8 +496,7 @@ int main(int argc, char** argv)
 			global_n_uncovered_lines -= global_attribute_totals[best_attribute];
 
 			// If we covered all of them, we can leave earlier
-			if (global_n_uncovered_lines == 0)
-			{
+			if (global_n_uncovered_lines == 0) {
 				best_attribute = -1;
 			}
 		}
@@ -530,8 +505,7 @@ int main(int argc, char** argv)
 		MPI_Bcast(&best_attribute, 1, MPI_INT64_T, 0, comm);
 
 		// If best_attribute is -1 we are done
-		if (best_attribute < 0)
-		{
+		if (best_attribute < 0) {
 			goto show_solution;
 		}
 
@@ -540,63 +514,49 @@ int main(int argc, char** argv)
 
 		// If we covered all of them, we can leave earlier?
 		// No we don't: We need to participate in the MPI_Reduce
-		if (n_uncovered_lines == 0)
-		{
+		if (n_uncovered_lines == 0) {
 			// Reset attributes totals because we can have some remaining values
-			// from previous run
-			memset(attribute_totals, 0,
-				   dataset.n_attributes * sizeof(uint64_t));
+			// from a previous run
+			memset(attribute_totals, 0, dataset.n_attributes * sizeof(uint64_t));
 			continue;
 		}
 
 		get_column(&dataset, &dm, best_attribute, best_column);
 
-		if (n_uncovered_lines < attribute_totals[best_attribute])
-		{
+//		if (n_uncovered_lines < attribute_totals[best_attribute]) {
 			// Add
 			// Update covered lines
-			update_covered_lines(best_column, dm.n_words_in_a_column,
-								 covered_lines);
+			update_covered_lines(best_column, dm.n_words_in_a_column, covered_lines);
 
-			calculate_attribute_totals_add(&dataset, &dm, covered_lines,
-										   attribute_totals);
-		}
-		else
-		{
-			// Sub
-			for (uint64_t w = 0; w < dm.n_words_in_a_column; w++)
-			{
-				best_column[w] &= ~covered_lines[w];
-			}
-
-			calculate_attribute_totals_sub(&dataset, &dm, best_column,
-										   attribute_totals);
-
-			// Update covered lines
-			update_covered_lines(best_column, dm.n_words_in_a_column,
-								 covered_lines);
-		}
+			calculate_attribute_totals_add(&dataset, &dm, covered_lines, attribute_totals);
+//		} else {
+//			// Sub
+//			for (uint64_t w = 0; w < dm.n_words_in_a_column; w++) {
+//				best_column[w] &= ~covered_lines[w];
+//			}
+//
+//			calculate_attribute_totals_sub(&dataset, &dm, best_column, attribute_totals);
+//
+//			// Update covered lines
+//			update_covered_lines(best_column, dm.n_words_in_a_column, covered_lines);
+//		}
 	}
 
-show_solution:
+	show_solution:
 	// wait for everyone
 	MPI_Barrier(comm);
 
-	if (rank == ROOT_RANK)
-	{
+	if (rank == ROOT_RANK) {
 		fprintf(stdout, "Solution: { ");
 
 		uint64_t current_attribute = 0;
-		uint64_t solution_size	   = 0;
+		uint64_t solution_size = 0;
 
-		for (uint64_t w = 0; w < dataset.n_words; w++)
-		{
+		for (uint64_t w = 0; w < dataset.n_words; w++) {
 			for (int8_t bit = WORD_BITS - 1;
-				 bit >= 0 && current_attribute < dataset.n_attributes;
-				 bit--, current_attribute++)
-			{
-				if (selected_attributes[w] & AND_MASK_TABLE[bit])
-				{
+					bit >= 0 && current_attribute < dataset.n_attributes;
+					bit--, current_attribute++) {
+				if (selected_attributes[w] & AND_MASK_TABLE[bit]) {
 					// This attribute is set so it's part of the solution
 					fprintf(stdout, "%lu ", current_attribute);
 					solution_size++;
@@ -632,7 +592,7 @@ show_solution:
 	free_dataset(&dataset);
 
 	PRINT_TIMING_GLOBAL;
-
+//end:
 	/* shut down MPI */
 	MPI_Finalize();
 

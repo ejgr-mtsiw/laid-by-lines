@@ -50,6 +50,12 @@ uint64_t get_class(const word_t* line, const uint64_t n_attributes,
 int compare_lines_extra(const void* a, const void* b, void* n_words);
 
 /**
+ * Compares two lines of the dataset by class
+ * Used to sort the dataset by class
+ */
+int compare_lines_by_class(const void* a, const void* b, void* n_words);
+
+/**
  * Checks if the lines have the same attributes
  */
 bool has_same_attributes(const word_t* a, const word_t* b,
@@ -73,5 +79,9 @@ oknok_t fill_class_arrays(dataset_t* dataset);
  * Frees dataset memory
  */
 void free_dataset(dataset_t* dataset);
+
+void print_dataset(dataset_t * dataset, uint64_t n_attributes, uint64_t n_observations);
+
+void print_line(word_t*line,uint64_t n_words, uint64_t n_attributes);
 
 #endif

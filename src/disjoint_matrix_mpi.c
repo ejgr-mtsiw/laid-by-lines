@@ -9,6 +9,7 @@
 #include "disjoint_matrix_mpi.h"
 #include "types/dataset_t.h"
 #include "types/dm_t.h"
+#include "types/line_class_t.h"
 #include "types/oknok_t.h"
 #include "types/word_t.h"
 #include "utils/bit.h"
@@ -29,10 +30,10 @@ oknok_t get_column(const dataset_t* dataset, const dm_t* dm,
 	// Reset best_column
 	memset(column, 0, dm->n_words_in_a_column * sizeof(word_t));
 
+	uint64_t nw = dataset->n_words;
 	uint64_t nc	   = dataset->n_classes;
-	uint64_t nobs  = dataset->n_observations;
-	word_t** opc   = dataset->observations_per_class;
-	uint64_t* nopc = dataset->n_observations_per_class;
+	//uint64_t nobs  = dataset->n_observations;
+	line_class_t *classes = dataset->classes;
 
 	uint64_t ca = dm->initial_class_offsets.classA;
 	uint64_t ia = dm->initial_class_offsets.indexA;
@@ -43,21 +44,19 @@ oknok_t get_column(const dataset_t* dataset, const dm_t* dm,
 
 	while (ca < nc - 1)
 	{
-		while (ia < nopc[ca])
+		while (ia < classes[ca].n_observations)
 		{
 			while (cb < nc)
 			{
-				while (ib < nopc[cb])
+				while (ib < classes[cb].n_observations)
 				{
 					if (cl == dm->s_size)
 					{
 						return OK;
 					}
 
-					word_t** bla = opc + ca * nobs;
-					word_t* la	 = *(bla + ia);
-					word_t** blb = opc + cb * nobs;
-					word_t* lb	 = *(blb + ib);
+					word_t* la = classes[ca].first_observation_address + ia*nw;
+					word_t* lb = classes[cb].first_observation_address + ib*nw;
 
 					word_t lxor = la[attribute_word] ^ lb[attribute_word];
 					if (BIT_CHECK(lxor, attribute_bit))
@@ -96,9 +95,9 @@ oknok_t calculate_class_offsets(const dataset_t* dataset, const uint64_t line,
 	uint64_t nc = dataset->n_classes;
 
 	/**
-	 * Number of observations per class in dataset
+	 * Class info
 	 */
-	uint64_t* nopc = dataset->n_observations_per_class;
+	line_class_t *classes=dataset->classes;
 
 	/**
 	 * Calculate the conditions for the first element of the disjoint matrix
@@ -110,9 +109,10 @@ oknok_t calculate_class_offsets(const dataset_t* dataset, const uint64_t line,
 		// For 2 classes the calculation is direct
 		// This process will start working from here
 		class_offsets->classA = 0;
-		class_offsets->indexA = line / nopc[1];
 		class_offsets->classB = 1;
-		class_offsets->indexB = line % nopc[1];
+
+		class_offsets->indexA = line / classes[class_offsets->classB].n_observations;
+		class_offsets->indexB = line % classes[class_offsets->classB].n_observations;
 	}
 	else
 	{
@@ -126,11 +126,11 @@ oknok_t calculate_class_offsets(const dataset_t* dataset, const uint64_t line,
 		// TODO: is there a better way?
 		for (ca = 0; ca < nc - 1; ca++)
 		{
-			for (ia = 0; ia < nopc[ca]; ia++)
+			for (ia = 0; ia < classes[ca].n_observations; ia++)
 			{
 				for (cb = ca + 1; cb < nc; cb++)
 				{
-					for (ib = 0; ib < nopc[cb]; ib++, cl++)
+					for (ib = 0; ib < classes[cb].n_observations; ib++, cl++)
 					{
 						if (cl == line)
 						{
