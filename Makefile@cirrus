@@ -4,7 +4,8 @@ LDFLAGS			:= -lm
 BUILD			:= ./bin
 OBJ_DIR			:= $(BUILD)/objects
 APP_DIR			:= $(BUILD)
-TARGET			:= laid-by-lines
+GIT_TAG			:= $(shell git log -1 --pretty=format:"%h")
+TARGET			:= laid-by-lines_$(GIT_TAG)
 INCLUDE			:= -I./src
 SRC_DIRS		:= ./src
 SRC				:= $(shell find $(SRC_DIRS) -name *.c)
